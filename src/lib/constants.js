@@ -52,9 +52,9 @@ export const SCHEDULE = [
   { date: '4월 TAG일', label: '인증서 수여식', status: 'upcoming' },
 ];
 
-// ─── 관리자 (이후경) 아이디·비밀번호 (.env.local에서 설정) ───
-export const ADMIN_ID = import.meta.env.VITE_ADMIN_ID || 'lhk';
-export const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'lhk';
+// ─── 관리자 (강선애 | 이후경) 아이디·비밀번호 (.env.local에서 설정) ───
+export const ADMIN_ID = import.meta.env.VITE_ADMIN_ID || 'ksa';
+export const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'ksa';
 
 // ─── 평가 관련 상수 ───
 export const PASS_SCORE = 70;

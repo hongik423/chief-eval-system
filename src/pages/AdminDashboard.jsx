@@ -87,7 +87,7 @@ export default function AdminDashboard() {
             <Badge variant="gold">PM</Badge>
             <ConnectionStatus />
           </div>
-          <p className="text-sm text-slate-400">이후경 HRD 실장 · 전체 평가 현황 관리</p>
+          <p className="text-sm text-slate-400">강선애 | 이후경 · 전체 평가 현황 관리</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {periods.length > 1 && (

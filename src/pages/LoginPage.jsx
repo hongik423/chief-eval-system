@@ -131,7 +131,7 @@ export default function LoginPage() {
               ⚙
             </div>
             <div>
-              <div className="text-sm font-semibold text-white">관리자 (이후경 PM) <span className="text-slate-500 font-normal">({ADMIN_ID})</span></div>
+              <div className="text-sm font-semibold text-white">관리자 (강선애 | 이후경) <span className="text-slate-500 font-normal">({ADMIN_ID})</span></div>
               <div className="text-[11px] text-slate-500">HRD 실장 · 전체 현황 관리</div>
             </div>
             {isAdmin && <span className="text-yellow-400 text-base ml-auto">✓</span>}
