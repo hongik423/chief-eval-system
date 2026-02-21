@@ -8,12 +8,21 @@
   padding: 0;
 }
 
+html {
+  /* iOS safe area - 노치/홈 인디케이터 영역 확보 */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 body {
   background: #0B0E14;
   color: #E8ECF4;
   font-family: 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* 터치 스크롤 부드럽게 */
+  -webkit-overflow-scrolling: touch;
 }
 
 input[type="number"]::-webkit-inner-spin-button,

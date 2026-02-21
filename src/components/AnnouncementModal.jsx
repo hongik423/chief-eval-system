@@ -15,12 +15,12 @@ export default function AnnouncementModal({ open, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-surface-100 border border-surface-500 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="bg-surface-100 border border-surface-500 rounded-2xl max-w-3xl w-full max-h-[90vh] min-h-0 flex flex-col shadow-2xl mx-2 sm:mx-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-surface-500/60 shrink-0">
           <h2 className="text-lg font-bold text-white">2026년 ASSO 치프(PM) 인증 평가 공고</h2>
           <Button variant="ghost" size="sm" onClick={onClose}>닫기</Button>
         </div>
-        <div className="flex-1 overflow-y-auto p-6 text-[13px] text-slate-300 leading-relaxed space-y-6">
+        <div className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 text-[13px] text-slate-300 leading-relaxed space-y-6">
           {/* 1. 개요 */}
           <section>
             <h3 className="font-bold text-white mb-2">1. 개요</h3>

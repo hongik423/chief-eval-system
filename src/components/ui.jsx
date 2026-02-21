@@ -25,7 +25,7 @@ export function Card({ children, className = '', onClick, hover = false, ...rest
     <div
       {...rest}
       onClick={onClick}
-      className={`bg-surface-200 border border-surface-500/60 rounded-xl p-6 transition-all duration-200
+      className={`bg-surface-200 border border-surface-500/60 rounded-xl p-4 sm:p-6 transition-all duration-200
         ${onClick ? 'cursor-pointer' : ''}
         ${hover ? 'hover:border-brand-500/30 hover:bg-surface-300/50' : ''}
         ${className}`}
@@ -45,9 +45,9 @@ export function Button({ children, variant = 'primary', size = 'md', onClick, di
     success: 'bg-emerald-500 hover:bg-emerald-600 text-white border-transparent',
   };
   const sizes = {
-    sm: 'px-3 py-1.5 text-xs',
-    md: 'px-5 py-2.5 text-sm',
-    lg: 'px-7 py-3.5 text-sm',
+    sm: 'px-3 py-2 sm:py-1.5 text-xs min-h-[44px] sm:min-h-0',
+    md: 'px-5 py-3 sm:py-2.5 text-sm min-h-[44px] sm:min-h-0',
+    lg: 'px-7 py-4 sm:py-3.5 text-sm min-h-[48px] sm:min-h-0',
   };
 
   return (
@@ -71,7 +71,7 @@ export function ScoreInput({ value, max, onChange, disabled = false }) {
   const barColor = pct >= 80 ? 'bg-emerald-400' : pct >= 60 ? 'bg-amber-400' : pct > 0 ? 'bg-red-400' : 'bg-surface-500';
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2 sm:gap-3">
       <input
         type="number"
         min={0}
@@ -88,7 +88,7 @@ export function ScoreInput({ value, max, onChange, disabled = false }) {
           const v = raw === '' ? null : Math.max(0, Math.min(max, parseInt(raw, 10) || 0));
           if (value !== v) onChange(v);
         }}
-        className="w-16 px-2.5 py-2 rounded-lg border border-surface-500 bg-surface-50 text-white text-[15px] font-bold text-center font-mono outline-none focus:border-brand-500 transition-colors disabled:opacity-40"
+        className="w-14 sm:w-16 px-2 sm:px-2.5 py-2.5 sm:py-2 rounded-lg border border-surface-500 bg-surface-50 text-white text-[15px] font-bold text-center font-mono outline-none focus:border-brand-500 transition-colors disabled:opacity-40 min-h-[44px] sm:min-h-0"
       />
       <span className="text-xs text-slate-500 font-medium min-w-[32px]">/ {max}</span>
       <div className="flex-1 h-1 bg-surface-500/40 rounded-full overflow-hidden">

@@ -65,20 +65,18 @@ export default function EvaluatorDashboard({ onSelectCandidate }) {
   }
 
   return (
-    <div className="max-w-[900px] mx-auto px-4 py-6">
+    <div className="max-w-[900px] mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-8 sm:pb-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-[22px] font-extrabold text-white tracking-tight">치프인증 평가</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-xl sm:text-[22px] font-extrabold text-white tracking-tight">치프인증 평가</h1>
+          <p className="text-xs sm:text-sm text-slate-400">
             {evaluator?.name} {evaluator?.role} · {evaluator?.team}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setShowChangePw(true)}>
-            비밀번호 변경
-          </Button>
-          <Button variant="secondary" size="sm" onClick={logout}>로그아웃</Button>
+          <Button variant="ghost" size="sm" onClick={() => setShowChangePw(true)} className="min-h-[44px] sm:min-h-0">비밀번호 변경</Button>
+          <Button variant="secondary" size="sm" onClick={logout} className="min-h-[44px] sm:min-h-0">로그아웃</Button>
         </div>
       </div>
 
@@ -133,16 +131,16 @@ export default function EvaluatorDashboard({ onSelectCandidate }) {
 
       {/* Progress Summary */}
       <Card className="mb-6 !p-4">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <div className="text-2xl">📊</div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold text-white">나의 평가 진행률</div>
             <div className="text-xs text-slate-500 mt-0.5">
               {candidates.filter(c => !isExcluded(currentUser, c.id) && isComplete(c.id)).length}
               /{candidates.filter(c => !isExcluded(currentUser, c.id)).length}명 완료
             </div>
           </div>
-          <div className="h-2 flex-1 max-w-[200px] bg-surface-500/40 rounded-full overflow-hidden">
+          <div className="h-2 w-full sm:flex-1 sm:max-w-[200px] bg-surface-500/40 rounded-full overflow-hidden shrink-0">
             {(() => {
               const eligible = candidates.filter(c => !isExcluded(currentUser, c.id));
               const done = eligible.filter(c => isComplete(c.id));
@@ -172,7 +170,7 @@ export default function EvaluatorDashboard({ onSelectCandidate }) {
               hover={!excluded}
               onClick={() => !excluded && onSelectCandidate(cand.id)}
               onKeyDown={(e) => !excluded && (e.key === 'Enter' || e.key === ' ') && onSelectCandidate(cand.id)}
-              className={`flex items-center gap-5 !py-5
+              className={`flex items-center gap-3 sm:gap-5 !py-4 sm:!py-5 min-h-[72px] sm:min-h-0
                 ${excluded ? 'opacity-40 !cursor-not-allowed' : ''}
                 ${complete ? '!border-emerald-500/30' : ''}`}
             >
@@ -186,7 +184,7 @@ export default function EvaluatorDashboard({ onSelectCandidate }) {
                 <div className="text-base font-bold text-white">{cand.name}</div>
                 <div className="text-xs text-slate-500 mt-0.5">{cand.team}</div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap justify-end">
                 {excluded ? (
                   <Badge variant="muted">동일팀 제외</Badge>
                 ) : complete ? (

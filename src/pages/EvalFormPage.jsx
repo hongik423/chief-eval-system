@@ -95,25 +95,27 @@ export default function EvalFormPage({ candidateId, onBack }) {
   }
 
   return (
-    <div className="max-w-[800px] mx-auto px-4 py-6">
+    <div className="max-w-[800px] mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-8 sm:pb-6">
       {/* Top Nav */}
-      <div className="flex items-center gap-3 mb-7">
-        <Button variant="ghost" size="sm" onClick={onBack}>← 목록</Button>
-        <div className="flex-1" />
-        <Badge variant="default">{evaluator?.name} 위원</Badge>
-        <span className="text-slate-600">→</span>
-        <Badge variant="gold">{candidate?.name} 응시자</Badge>
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6 sm:mb-7">
+        <Button variant="ghost" size="sm" onClick={onBack} className="min-h-[44px] sm:min-h-0 shrink-0">← 목록</Button>
+        <div className="flex-1 min-w-0" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="default" className="truncate">{evaluator?.name} 위원</Badge>
+          <span className="text-slate-600 hidden sm:inline">→</span>
+          <Badge variant="gold" className="truncate">{candidate?.name} 응시자</Badge>
+        </div>
       </div>
 
       {/* Score Summary */}
-      <Card className="mb-5 flex items-center gap-6 !py-5">
+      <Card className="mb-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 !py-5">
         <ProgressRing value={totalScore} max={100} />
         <div className="flex-1">
           <div className="text-xs text-slate-500 mb-1">PM 역량평가 점수</div>
           <div className="text-3xl font-extrabold text-white font-mono">
             {totalScore}<span className="text-sm text-slate-500 font-normal ml-1">/ 100점</span>
           </div>
-          <div className="flex gap-2 mt-2">
+          <div className="flex flex-wrap gap-2 mt-2">
             {criteriaSections.map(sec => (
               <Badge key={sec.id} variant="muted">
                 {sec.id}. {sectionTotals[sec.id] || 0}/{sec.maxScore}
@@ -190,12 +192,13 @@ export default function EvalFormPage({ candidateId, onBack }) {
       </Card>
 
       {/* Actions */}
-      <div className="flex gap-3 justify-end pb-10">
-        <Button variant="secondary" onClick={onBack}>취소</Button>
+      <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end pb-10">
+        <Button variant="secondary" onClick={onBack} className="w-full sm:w-auto min-h-[48px] sm:min-h-0">취소</Button>
         <Button
           variant={allFilled ? 'success' : 'primary'}
           onClick={handleComplete}
           disabled={!allFilled || saving}
+          className="w-full sm:w-auto min-h-[48px] sm:min-h-0"
         >
           {saving ? '저장 중...' : allFilled ? '✓ 평가 완료 저장' : '모든 항목을 입력해 주세요'}
         </Button>

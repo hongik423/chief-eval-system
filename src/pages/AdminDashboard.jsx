@@ -93,18 +93,18 @@ export default function AdminDashboard() {
 
   return (
     <>
-    <div className="max-w-[1200px] mx-auto px-4 py-6">
+    <div className="max-w-[1200px] mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-8 sm:pb-6">
       {/* Header + Period Selector */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-[22px] font-extrabold text-white tracking-tight">관리자 대시보드</h1>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-1">
+            <h1 className="text-xl sm:text-[22px] font-extrabold text-white tracking-tight">관리자 대시보드</h1>
             <Badge variant="gold">PM</Badge>
             <ConnectionStatus />
           </div>
-          <p className="text-sm text-slate-400">강선애 | 이후경 · 전체 평가 현황 관리</p>
+          <p className="text-xs sm:text-sm text-slate-400">강선애 | 이후경 · 전체 평가 현황 관리</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap min-h-[44px]">
           {periods.length > 1 && (
             <select
               value={selectedPeriodId || ''}
@@ -112,7 +112,7 @@ export default function AdminDashboard() {
                 const v = e.target.value;
                 if (v) setSelectedPeriod(v);
               }}
-              className="px-3 py-2 rounded-lg bg-surface-200 border border-surface-500 text-white text-sm font-medium outline-none focus:border-brand-500"
+              className="px-3 py-2.5 min-h-[44px] sm:min-h-0 rounded-lg bg-surface-200 border border-surface-500 text-white text-sm font-medium outline-none focus:border-brand-500"
             >
               {periods.map(p => (
                 <option key={p.id} value={p.id}>
@@ -121,18 +121,18 @@ export default function AdminDashboard() {
               ))}
             </select>
           )}
-          <Button variant="danger" size="sm" onClick={handleResetClick}>초기화</Button>
-          <Button variant="secondary" size="sm" onClick={logout}>로그아웃</Button>
+          <Button variant="danger" size="sm" onClick={handleResetClick} className="min-h-[44px] sm:min-h-0">초기화</Button>
+          <Button variant="secondary" size="sm" onClick={logout} className="min-h-[44px] sm:min-h-0">로그아웃</Button>
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 mb-6 bg-surface-100 p-1 rounded-xl border border-surface-500/30 overflow-x-auto">
+      <div className="flex gap-1 mb-6 bg-surface-100 p-1 rounded-xl border border-surface-500/30 overflow-x-auto scrollbar-thin -mx-3 px-3 sm:mx-0 sm:px-0" style={{ scrollbarWidth: 'thin' }}>
         {TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all
+            className={`flex items-center gap-2 px-3 sm:px-4 py-3 sm:py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all min-h-[44px] sm:min-h-0 flex-shrink-0
               ${activeTab === tab.id
                 ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20'
                 : 'text-slate-400 hover:text-white hover:bg-surface-300/50'}`}
@@ -183,7 +183,7 @@ export default function AdminDashboard() {
 
           {/* Bonus Scores */}
           <SectionHeader>치프 역량 강화 교육 이수 가점 (담당코치: 하상현 수석, 최대 10점)</SectionHeader>
-          <Card className="mb-6">
+          <Card className="mb-6 !p-4 sm:!p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {candidates.map(cand => (
                 <div key={cand.id} className="p-4 rounded-xl bg-surface-100 border border-surface-500/30">
@@ -237,7 +237,7 @@ export default function AdminDashboard() {
                 {/* Header Row */}
                 <div
                   onClick={() => setExpandedCandidate(isExpanded ? null : result.candidate.id)}
-                  className="flex items-center gap-4 px-6 py-4 cursor-pointer hover:bg-surface-300/30 transition-colors"
+                  className="flex flex-wrap sm:flex-nowrap items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 cursor-pointer hover:bg-surface-300/30 transition-colors min-h-[72px]"
                 >
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-base font-bold shrink-0
                     ${result.pass === true ? 'bg-emerald-500/10 text-emerald-400'
@@ -267,12 +267,14 @@ export default function AdminDashboard() {
                       size="sm"
                       onClick={() => handleJudge(result.candidate.id, true)}
                       disabled={result.finalAvg == null}
+                      className="min-h-[40px] sm:min-h-0"
                     >합격</Button>
                     <Button
                       variant={result.candidate.status === 'failed' ? 'danger' : 'ghost'}
                       size="sm"
                       onClick={() => handleJudge(result.candidate.id, false)}
                       disabled={result.finalAvg == null}
+                      className="min-h-[40px] sm:min-h-0"
                     >불합격</Button>
                   </div>
 
@@ -281,9 +283,9 @@ export default function AdminDashboard() {
 
                 {/* Expanded Detail */}
                 {isExpanded && (
-                  <div className="px-6 pb-5 border-t border-surface-500/20">
+                  <div className="px-4 sm:px-6 pb-5 border-t border-surface-500/20">
                     {/* Score Table */}
-                    <div className="overflow-x-auto mt-4">
+                    <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0 mt-4">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-surface-500/40">

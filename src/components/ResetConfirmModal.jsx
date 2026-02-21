@@ -48,7 +48,7 @@ export default function ResetConfirmModal({ open, onClose, onConfirm, isResettin
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-surface-100 border border-red-500/40 rounded-2xl max-w-md w-full shadow-2xl shadow-red-500/10" onClick={(e) => e.stopPropagation()}>
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div>
