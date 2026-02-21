@@ -3,10 +3,12 @@ import { useStore } from '@/lib/store';
 import { ADMIN_ID } from '@/lib/constants';
 import { Card, Button, ConnectionStatus } from '@/components/ui';
 import ManualModal from '@/components/ManualModal';
+import AnnouncementModal from '@/components/AnnouncementModal';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
   const [manualOpen, setManualOpen] = useState(false);
+  const [announcementOpen, setAnnouncementOpen] = useState(false);
   const { evaluators, allEvaluators, loginWithPassword } = useStore();
   const loginEvaluators = evaluators?.length > 0 ? evaluators : (allEvaluators || []);
   const [selectedId, setSelectedId] = useState(null);
@@ -183,7 +185,14 @@ export default function LoginPage() {
         <p className="text-center text-[11px] text-slate-600 mt-6">
           평가일: 2026년 3월 28일(토) · 문의: 010-9251-9743
         </p>
-        <p className="text-center mt-3">
+        <p className="text-center mt-3 flex justify-center gap-4">
+          <button
+            type="button"
+            onClick={() => setAnnouncementOpen(true)}
+            className="text-xs text-slate-500 hover:text-brand-400 underline underline-offset-2 transition-colors"
+          >
+            공고 보기
+          </button>
           <button
             type="button"
             onClick={() => setManualOpen(true)}
@@ -193,6 +202,7 @@ export default function LoginPage() {
           </button>
         </p>
       </div>
+      <AnnouncementModal open={announcementOpen} onClose={() => setAnnouncementOpen(false)} />
       <ManualModal open={manualOpen} onClose={() => setManualOpen(false)} isAdmin={false} />
     </div>
   );

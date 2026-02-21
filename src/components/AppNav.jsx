@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { Button, Badge, ConnectionStatus } from '@/components/ui';
 import ManualModal from '@/components/ManualModal';
+import AnnouncementModal from '@/components/AnnouncementModal';
 
 export default function AppNav() {
   const { currentUser, isAdmin, logout, evaluators } = useStore();
   const evaluator = evaluators.find(e => e.id === currentUser);
   const [manualOpen, setManualOpen] = useState(false);
+  const [announcementOpen, setAnnouncementOpen] = useState(false);
 
   return (
     <>
@@ -31,6 +33,9 @@ export default function AppNav() {
           {/* Nav Links - 로그인 시에만 */}
           {currentUser && (
             <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setAnnouncementOpen(true)}>
+                공고
+              </Button>
               <Button variant="ghost" size="sm" onClick={() => setManualOpen(true)}>
                 사용 매뉴얼
               </Button>
@@ -50,6 +55,7 @@ export default function AppNav() {
         </div>
       </nav>
       <ManualModal open={manualOpen} onClose={() => setManualOpen(false)} isAdmin={isAdmin} />
+      <AnnouncementModal open={announcementOpen} onClose={() => setAnnouncementOpen(false)} />
     </>
   );
 }
