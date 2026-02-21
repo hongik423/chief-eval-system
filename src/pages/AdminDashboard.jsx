@@ -60,8 +60,10 @@ export default function AdminDashboard() {
   const handleBonusChange = async (candId, value) => {
     try {
       await saveBonusScore(candId, value);
+      toast.success('가점이 저장되었습니다.');
     } catch (err) {
-      toast.error('가점 저장 실패');
+      console.error('가점 저장 실패:', err);
+      toast.error('가점 저장 실패: ' + (err?.message || '알 수 없는 오류'));
     }
   };
 

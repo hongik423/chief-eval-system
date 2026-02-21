@@ -332,14 +332,18 @@ export const useStore = create((set, get) => ({
   saveBonusScore: async (candidateId, score) => {
     const state = get();
     const periodId = state.periodInfo?.id || state.selectedPeriodId || CURRENT_PERIOD_ID;
-    const newBonus = { ...state.bonusScores, [candidateId]: score };
+    if (!periodId) throw new Error('평가 기간이 선택되지 않았습니다.');
+
+    // null/undefined 시 0으로 처리 (DB NOT NULL 제약)
+    const safeScore = Math.max(0, Math.min(10, Number(score) || 0));
+    const newBonus = { ...state.bonusScores, [candidateId]: safeScore };
     set({ bonusScores: newBonus });
 
     const { error } = await supabase.from('chief_bonus_scores')
       .upsert({
         period_id: periodId,
         candidate_id: candidateId,
-        score: score,
+        score: safeScore,
         coach_id: 'hsh',
       }, { onConflict: 'period_id,candidate_id' });
 
