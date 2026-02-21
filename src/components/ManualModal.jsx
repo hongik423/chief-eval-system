@@ -27,7 +27,7 @@ const ADMIN_MANUAL = [
   { title: '6. 평가보고서', content: 'AI(Gemini + GPT)로 응시자별 평가보고서를 자동 생성합니다. 표지에 치프인증자 이름과 AI 생성 이미지가 포함되며, Word(.docx)로 다운로드됩니다. VITE_GEMINI_API_KEY, VITE_OPENAI_API_KEY 설정 필요.' },
   { title: '7. 평가표 관리', content: '평가 기준(역량 섹션, 항목, 배점)을 수정·추가할 수 있습니다. 기간별로 적용됩니다.' },
   { title: '8. 데이터 추적', content: '점수 변경·세션 완료 등 모든 데이터 변경 이력(audit_log)을 조회합니다.' },
-  { title: '9. 초기화', content: '[초기화] 버튼은 모든 평가 데이터를 삭제합니다. 신중히 사용하세요.' },
+  { title: '9. 초기화', content: '[초기화] 버튼은 관리자 전용입니다. 클릭 시 관리자 비밀번호 재입력과 확인 문구 "초기화하라" 입력이 필요합니다. 두 조건을 모두 만족해야 실행되며, 모든 평가 점수·세션·가점·합격여부가 삭제됩니다. 되돌릴 수 없으니 신중히 사용하세요.' },
 ];
 
 export default function ManualModal({ open, onClose, isAdmin }) {

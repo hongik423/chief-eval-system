@@ -5,6 +5,7 @@ import {
   Card, Badge, Button, ScoreInput, ProgressRing,
   SectionHeader, StatBox, ConnectionStatus, Spinner,
 } from '@/components/ui';
+import ResetConfirmModal from '@/components/ResetConfirmModal';
 import { generateEvaluationReport } from '@/lib/aiReport';
 import { exportReportToDocx } from '@/lib/exportDocx';
 import toast from 'react-hot-toast';
@@ -35,6 +36,8 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedCandidate, setExpandedCandidate] = useState(null);
   const [expandedEvaluator, setExpandedEvaluator] = useState(null);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'audit') loadAuditLog();
@@ -71,13 +74,23 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleReset = async () => {
-    if (!confirm('모든 평가 데이터를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
-    await resetAllData();
-    toast.success('데이터가 초기화되었습니다.');
+  const handleResetClick = () => setResetModalOpen(true);
+
+  const handleResetConfirm = async () => {
+    setIsResetting(true);
+    try {
+      await resetAllData();
+      setResetModalOpen(false);
+      toast.success('데이터가 초기화되었습니다.');
+    } catch (err) {
+      toast.error('초기화 실패: ' + (err?.message || '알 수 없는 오류'));
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   return (
+    <>
     <div className="max-w-[1200px] mx-auto px-4 py-6">
       {/* Header + Period Selector */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -106,7 +119,7 @@ export default function AdminDashboard() {
               ))}
             </select>
           )}
-          <Button variant="danger" size="sm" onClick={handleReset}>초기화</Button>
+          <Button variant="danger" size="sm" onClick={handleResetClick}>초기화</Button>
           <Button variant="secondary" size="sm" onClick={logout}>로그아웃</Button>
         </div>
       </div>
@@ -536,6 +549,14 @@ export default function AdminDashboard() {
         </div>
       )}
     </div>
+
+    <ResetConfirmModal
+      open={resetModalOpen}
+      onClose={() => setResetModalOpen(false)}
+      onConfirm={handleResetConfirm}
+      isResetting={isResetting}
+    />
+  </>
   );
 }
 
