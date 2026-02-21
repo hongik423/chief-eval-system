@@ -1,0 +1,51 @@
+# 기업의별 치프인증 평가 시스템 - Cursor Rules
+
+## 프로젝트 개요
+- 기업의별(Stellain) 세무 컨설팅 플랫폼의 ASSO→치프(PM) 인증 평가 웹앱
+- 평가위원 7명이 응시자 4명을 9개 항목(100점)으로 평가
+- 가점(10점) 포함 110점 만점, 평균 70점 이상 합격
+
+## 기술 스택
+- Frontend: React 18 + Vite + Tailwind CSS 3
+- State: Zustand (src/lib/store.js)
+- Backend: Supabase (PostgreSQL) - localStorage fallback 지원
+- 배포: Vercel
+- 언어: 한국어 UI
+
+## 핵심 파일 구조
+```
+src/
+  lib/
+    supabase.js    - Supabase 클라이언트
+    store.js       - Zustand 중앙 상태관리 (★ 핵심)
+    constants.js   - 평가위원, 응시자, 평가기준 데이터
+  components/
+    ui.jsx         - 공통 UI 컴포넌트 (Badge, Card, Button, ScoreInput 등)
+  pages/
+    LoginPage.jsx          - 로그인 (평가위원 선택)
+    EvaluatorDashboard.jsx - 평가위원 메인 화면
+    EvalFormPage.jsx       - 점수 입력 폼
+    AdminDashboard.jsx     - 관리자 대시보드 (5개 탭)
+supabase/
+  schema.sql       - DB 스키마 + seed 데이터 + triggers
+```
+
+## 코딩 규칙
+- 컴포넌트는 함수형 + hooks 사용
+- Tailwind 유틸리티 클래스 사용 (인라인 style 지양)
+- 다크 테마 기본 (surface-0 ~ surface-500 계열)
+- Supabase 호출은 store.js에서만 수행
+- 한국어 주석, 한국어 UI 텍스트
+- 새 기능 추가 시 store.js에 액션 추가 → 페이지에서 호출 패턴
+
+## 평가 비즈니스 로직
+- 점수 산정: (Σ PM역량점수 + 가점) ÷ 유효 평가위원수
+- 동일팀 평가위원은 자동 제외 (is_excluded)
+- 모든 점수 변경은 audit_log에 자동 기록 (DB trigger)
+- evaluation_sessions: 평가위원↔응시자 1:1 매핑
+- evaluation_scores: 항목별 개별 점수 저장
+
+## 주의사항
+- Supabase 미연결 시 localStorage fallback이 작동해야 함
+- 평가 기준(criteria)은 관리자가 수정/추가 가능한 동적 구조
+- Vercel 배포를 위해 SSR 없이 SPA로 유지
