@@ -1,11 +1,55 @@
 /**
  * 평가보고서 AI 생성 - Gemini + OpenAI 병렬 호출 후 최적 답변 선택
+ * 표지 이미지: Gemini 이미지 생성 모델 활용
  * @encoding UTF-8
  */
 
 // Gemini 3.0 Flash, GPT 5.2 - 우수한 성능
-const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-3-flash-preview';
+const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.0-flash';
 const OPENAI_MODEL = import.meta.env.VITE_OPENAI_MODEL || 'gpt-5.2';
+// 표지 이미지 생성용 (gemini-2.0-flash-preview-image-generation, gemini-2.5-flash-preview-05-20 등)
+const GEMINI_IMAGE_MODEL = import.meta.env.VITE_GEMINI_IMAGE_MODEL || 'gemini-2.0-flash-preview-image-generation';
+
+/**
+ * Gemini 이미지 생성 - 치프인증자 이름이 들어간 표지 이미지
+ * @param {string} candidateName - 응시자(치프인증자) 이름
+ * @param {string} apiKey - Gemini API 키
+ * @returns {Promise<string|null>} base64 이미지 데이터 또는 실패 시 null
+ */
+export async function generateCoverImage(candidateName, apiKey) {
+  if (!apiKey) return null;
+  const prompt = `Create a professional, elegant certificate cover image for "기업의별 치프인증 평가 보고서" (Stellain Chief Certification Evaluation Report). 
+The image must prominently display the recipient name "${candidateName}" (치프인증자) in Korean.
+Style: clean, corporate, trustworthy, blue/teal color scheme. Minimal design. 
+Do not include any placeholder text. Use the exact name: ${candidateName}.`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${apiKey}`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseModalities: ['IMAGE'],
+        },
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.warn('Gemini 이미지 생성 실패:', err);
+      return null;
+    }
+    const data = await res.json();
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    for (const part of parts) {
+      const inlineData = part.inlineData || part.inline_data;
+      if (inlineData?.data) return inlineData.data;
+    }
+  } catch (e) {
+    console.warn('표지 이미지 생성 오류:', e);
+  }
+  return null;
+}
 
 /**
  * Gemini API 호출
@@ -82,6 +126,8 @@ function selectBestResponse(geminiRes, openaiRes) {
 
 /**
  * 응시자 평가보고서 생성 - Gemini + OpenAI 병렬 호출 후 최적 선택
+ * 표지 이미지(Gemini 이미지 생성) 병렬 생성
+ * @returns {{ content: string, coverImageBase64: string|null }}
  */
 export async function generateEvaluationReport(candidateData) {
   const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -89,26 +135,29 @@ export async function generateEvaluationReport(candidateData) {
 
   const prompt = buildReportPrompt(candidateData);
 
-  const calls = [];
-  if (geminiKey) calls.push(callGemini(prompt, geminiKey));
-  if (openaiKey) calls.push(callOpenAI(prompt, openaiKey));
+  // 보고서 본문 + 표지 이미지 병렬 생성
+  const [reportResult, coverImageBase64] = await Promise.all([
+    (async () => {
+      const calls = [];
+      if (geminiKey) calls.push(callGemini(prompt, geminiKey));
+      if (openaiKey) calls.push(callOpenAI(prompt, openaiKey));
+      if (calls.length === 0) {
+        throw new Error('VITE_GEMINI_API_KEY 또는 VITE_OPENAI_API_KEY가 설정되지 않았습니다.');
+      }
+      const results = await Promise.allSettled(calls);
+      const successes = results
+        .map((r) => (r.status === 'fulfilled' ? r.value : null))
+        .filter(Boolean);
+      if (successes.length === 0) {
+        const first = results.find(r => r.status === 'rejected');
+        throw first?.reason || new Error('AI API 호출 실패');
+      }
+      return successes.length === 1 ? successes[0] : selectBestResponse(successes[0], successes[1]);
+    })(),
+    generateCoverImage(candidateData.candidate?.name || '', geminiKey),
+  ]);
 
-  if (calls.length === 0) {
-    throw new Error('VITE_GEMINI_API_KEY 또는 VITE_OPENAI_API_KEY가 설정되지 않았습니다.');
-  }
-
-  const results = await Promise.allSettled(calls);
-  const successes = results
-    .map((r, i) => (r.status === 'fulfilled' ? r.value : null))
-    .filter(Boolean);
-
-  if (successes.length === 0) {
-    const first = results.find(r => r.status === 'rejected');
-    throw first?.reason || new Error('AI API 호출 실패');
-  }
-
-  if (successes.length === 1) return successes[0];
-  return selectBestResponse(successes[0], successes[1]);
+  return { content: reportResult, coverImageBase64 };
 }
 
 /**

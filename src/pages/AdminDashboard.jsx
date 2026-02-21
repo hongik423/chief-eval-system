@@ -6,6 +6,7 @@ import {
   SectionHeader, StatBox, ConnectionStatus, Spinner,
 } from '@/components/ui';
 import { generateEvaluationReport } from '@/lib/aiReport';
+import { exportReportToDocx } from '@/lib/exportDocx';
 import toast from 'react-hot-toast';
 
 // ─── Tabs ───
@@ -810,13 +811,13 @@ function ReportTab({ candidateResults, criteriaSections }) {
   const handleGenerate = async (result) => {
     setGenerating(result.candidate.id);
     try {
-      const content = await generateEvaluationReport({
+      const { content, coverImageBase64 } = await generateEvaluationReport({
         ...result,
         criteriaSections,
       });
-      setReportContent(prev => ({ ...prev, [result.candidate.id]: content }));
+      setReportContent(prev => ({ ...prev, [result.candidate.id]: { content, coverImageBase64 } }));
       setSelectedCandidate(result.candidate.id);
-      toast.success(`${result.candidate.name} 평가보고서가 생성되었습니다.`);
+      toast.success(`${result.candidate.name} 평가보고서가 생성되었습니다. (표지 이미지 포함)`);
     } catch (err) {
       toast.error('보고서 생성 실패: ' + err.message);
     } finally {
@@ -825,15 +826,10 @@ function ReportTab({ candidateResults, criteriaSections }) {
   };
 
   const handleDownload = (candId, name) => {
-    const content = reportContent[candId];
-    if (!content) return;
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `치프인증_평가보고서_${name}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const data = reportContent[candId];
+    if (!data?.content) return;
+    exportReportToDocx(data.content, name, data.coverImageBase64 || null);
+    toast.success('Word 문서로 다운로드되었습니다.');
   };
 
   return (
@@ -842,9 +838,10 @@ function ReportTab({ candidateResults, criteriaSections }) {
         <div className="text-sm text-slate-400">
           <strong className="text-white">AI 평가보고서:</strong> 응시자별로 평가위원들의 점수와 섹션별 코멘트를 반영하여
           AI(Gemini + GPT 병렬 호출, 최적 답변 선택)로 평가보고서를 자동 생성합니다.
+          표지에 치프인증자 이름과 AI 생성 이미지가 포함되며, Word(.docx)로 다운로드됩니다.
           <br />
           <span className="text-xs text-slate-500 mt-1 block">
-            환경변수: VITE_GEMINI_API_KEY, VITE_OPENAI_API_KEY (.env.local)
+            환경변수: VITE_GEMINI_API_KEY, VITE_OPENAI_API_KEY, VITE_GEMINI_IMAGE_MODEL (.env.local)
           </span>
         </div>
       </Card>
@@ -868,7 +865,7 @@ function ReportTab({ candidateResults, criteriaSections }) {
                 {generating === result.candidate.id ? '생성 중...' : '보고서 생성'}
               </Button>
             </div>
-            {reportContent[result.candidate.id] && (
+            {reportContent[result.candidate.id]?.content && (
               <div className="flex gap-2">
                 <Button
                   variant="secondary"
@@ -882,7 +879,7 @@ function ReportTab({ candidateResults, criteriaSections }) {
                   size="sm"
                   onClick={() => handleDownload(result.candidate.id, result.candidate.name)}
                 >
-                  다운로드 (.md)
+                  다운로드 (.docx)
                 </Button>
               </div>
             )}
@@ -890,14 +887,14 @@ function ReportTab({ candidateResults, criteriaSections }) {
         ))}
       </div>
 
-      {selectedCandidate && reportContent[selectedCandidate] && (
+      {selectedCandidate && reportContent[selectedCandidate]?.content && (
         <Card className="!p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-white">보고서 미리보기</h3>
             <Button variant="ghost" size="sm" onClick={() => setSelectedCandidate(null)}>닫기</Button>
           </div>
           <pre className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-sans max-h-[400px] overflow-y-auto">
-            {reportContent[selectedCandidate]}
+            {reportContent[selectedCandidate].content}
           </pre>
         </Card>
       )}
