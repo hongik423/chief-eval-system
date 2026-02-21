@@ -5,8 +5,9 @@ import { Card, Badge, Button, SectionHeader } from '@/components/ui';
 import toast from 'react-hot-toast';
 
 export default function EvaluatorDashboard({ onSelectCandidate }) {
-  const { currentUser, evaluators, candidates, logout, isExcluded, getSessionStatus, getSessionScores, criteriaItems, changePassword } = useStore();
-  const evaluator = evaluators.find(e => e.id === currentUser);
+  const { currentUser, evaluators, allEvaluators, candidates, logout, isExcluded, getSessionStatus, getSessionScores, criteriaItems, changePassword, periodInfo } = useStore();
+  const evaluator = (evaluators || []).find(e => e.id === currentUser) || (allEvaluators || []).find(e => e.id === currentUser);
+  const hasPermission = (evaluators || []).some(e => e.id === currentUser);
   const [showChangePw, setShowChangePw] = useState(false);
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -46,6 +47,22 @@ export default function EvaluatorDashboard({ onSelectCandidate }) {
       setPwLoading(false);
     }
   };
+
+  if (!hasPermission && evaluator) {
+    return (
+      <div className="max-w-[900px] mx-auto px-4 py-20">
+        <Card className="text-center !p-12">
+          <div className="text-5xl mb-4">🔒</div>
+          <h2 className="text-xl font-bold text-white mb-2">이 평가 기간에 참여 권한이 없습니다</h2>
+          <p className="text-sm text-slate-400 mb-6">
+            {evaluator.name} 위원님은 {periodInfo?.name || '현재 기간'} 평가위원으로 배정되지 않았습니다.<br />
+            관리자에게 문의해 주세요.
+          </p>
+          <Button variant="secondary" onClick={logout}>로그아웃</Button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-[900px] mx-auto px-4 py-6">

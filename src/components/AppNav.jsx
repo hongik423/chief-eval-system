@@ -2,7 +2,7 @@ import { useStore } from '@/lib/store';
 import { Button, Badge, ConnectionStatus } from '@/components/ui';
 
 export default function AppNav() {
-  const { currentUser, isAdmin, logout, evaluators, usingSupabase } = useStore();
+  const { currentUser, isAdmin, logout, evaluators } = useStore();
   const evaluator = evaluators.find(e => e.id === currentUser);
 
   return (
@@ -11,7 +11,7 @@ export default function AppNav() {
         {/* Logo & Brand */}
         <div className="flex items-center gap-4">
           <a href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <span className="text-xl">★</span>
+            <img src="/bi.png" alt="기업의별" className="h-8 w-8 object-contain" />
             <span className="font-bold text-white text-[15px] hidden sm:inline">치프인증 평가</span>
           </a>
           <span className="text-slate-600 text-sm">|</span>
@@ -34,7 +34,7 @@ export default function AppNav() {
                 관리자 · 전체 현황 · 가점 · 데이터 추적
               </Badge>
             )}
-            <ConnectionStatus usingSupabase={usingSupabase} />
+            <ConnectionStatus />
             <Button variant="secondary" size="sm" onClick={logout}>
               로그아웃
             </Button>

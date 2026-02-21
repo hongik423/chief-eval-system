@@ -5,14 +5,15 @@ import { Card, Button, ConnectionStatus } from '@/components/ui';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
-  const { evaluators, loginWithPassword, usingSupabase } = useStore();
+  const { evaluators, allEvaluators, loginWithPassword } = useStore();
+  const loginEvaluators = evaluators?.length > 0 ? evaluators : (allEvaluators || []);
   const [selectedId, setSelectedId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminId, setAdminId] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const selectedEv = evaluators.find(e => e.id === selectedId && !isAdmin);
+  const selectedEv = loginEvaluators.find(e => e.id === selectedId && !isAdmin);
 
   const handleLogin = async () => {
     if (!selectedId) return;
@@ -55,8 +56,8 @@ export default function LoginPage() {
       <div className="w-full max-w-[520px] px-6">
         {/* Logo & Title */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5 bg-gradient-to-br from-brand-500 to-purple-500 shadow-lg shadow-brand-500/25">
-            <span className="text-3xl">★</span>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5 bg-surface-200/80 border border-surface-500/30 p-2 overflow-hidden">
+            <img src="/bi.png" alt="기업의별" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-[26px] font-extrabold text-white tracking-tight">
             기업의별 치프인증 평가
@@ -65,7 +66,7 @@ export default function LoginPage() {
             2026년 2기 · TEST RED 평가 시스템
           </p>
           <div className="mt-3">
-            <ConnectionStatus usingSupabase={usingSupabase} />
+            <ConnectionStatus />
           </div>
         </div>
 
@@ -73,7 +74,7 @@ export default function LoginPage() {
         <Card className="mb-4">
           <div className="text-xs font-semibold text-slate-500 mb-3 tracking-widest">평가위원 로그인 (아이디·비밀번호: 영어 2~3자)</div>
           <div className="space-y-1.5">
-            {evaluators.map((ev) => (
+            {loginEvaluators.map((ev) => (
               <div
                 key={ev.id}
                 data-testid={`evaluator-${ev.id}`}

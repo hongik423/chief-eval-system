@@ -26,8 +26,9 @@ DROP TABLE IF EXISTS chief_evaluation_sessions CASCADE;
 DROP TABLE IF EXISTS chief_bonus_scores CASCADE;
 DROP TABLE IF EXISTS chief_eval_criteria_items CASCADE;
 DROP TABLE IF EXISTS chief_eval_criteria_sections CASCADE;
-DROP TABLE IF EXISTS chief_eval_periods CASCADE;
+DROP TABLE IF EXISTS chief_period_evaluators CASCADE;
 DROP TABLE IF EXISTS chief_candidates CASCADE;
+DROP TABLE IF EXISTS chief_eval_periods CASCADE;
 DROP TABLE IF EXISTS chief_evaluators CASCADE;
 DROP TABLE IF EXISTS chief_audit_log CASCADE;
 
@@ -49,7 +50,7 @@ CREATE TABLE chief_eval_periods (
 );
 
 -- ═══════════════════════════════════════════════════════════════
--- 2. 평가위원 (chief_evaluators)
+-- 2. 평가위원 (chief_evaluators) - 전역 풀
 -- ═══════════════════════════════════════════════════════════════
 CREATE TABLE chief_evaluators (
   id TEXT PRIMARY KEY,                         -- 'ndh', 'kyd' 등
@@ -63,6 +64,17 @@ CREATE TABLE chief_evaluators (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- ═══════════════════════════════════════════════════════════════
+-- 2-1. 기간별 평가위원 매핑 (기간마다 추가/삭제 가능)
+-- ═══════════════════════════════════════════════════════════════
+CREATE TABLE chief_period_evaluators (
+  period_id UUID NOT NULL REFERENCES chief_eval_periods(id) ON DELETE CASCADE,
+  evaluator_id TEXT NOT NULL REFERENCES chief_evaluators(id),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (period_id, evaluator_id)
+);
+CREATE INDEX idx_chief_period_evaluators_period ON chief_period_evaluators(period_id);
 
 -- ═══════════════════════════════════════════════════════════════
 -- 3. 응시자 (chief_candidates)
@@ -122,7 +134,8 @@ CREATE TABLE chief_evaluation_sessions (
     CHECK (status IN ('pending', 'in_progress', 'completed')),
   is_excluded BOOLEAN DEFAULT false,           -- 동일팀 제외 여부
   total_score INTEGER,                         -- 자동 계산된 총점
-  comments TEXT,                               -- 종합 코멘트
+  comments TEXT,                               -- 종합 코멘트 (레거시)
+  comments_section JSONB DEFAULT '{}',         -- 섹션별 코멘트 {A, B, C}
   started_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -316,8 +329,10 @@ ALTER TABLE chief_eval_criteria_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chief_evaluation_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chief_evaluation_scores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chief_bonus_scores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chief_period_evaluators ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chief_audit_log ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "chief_anon_period_evaluators" ON chief_period_evaluators FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "chief_anon_periods" ON chief_eval_periods FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "chief_anon_evaluators" ON chief_evaluators FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "chief_anon_candidates" ON chief_candidates FOR ALL USING (true) WITH CHECK (true);

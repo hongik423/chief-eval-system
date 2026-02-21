@@ -173,13 +173,12 @@ export function SectionHeader({ children, className = '' }) {
   );
 }
 
-// ─── Connection Status ───
-export function ConnectionStatus({ usingSupabase }) {
+// ─── Connection Status (Supabase 필수) ───
+export function ConnectionStatus() {
   return (
-    <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium
-      ${usingSupabase ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
-      <div className={`w-1.5 h-1.5 rounded-full ${usingSupabase ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-      {usingSupabase ? 'Supabase 연결됨' : 'localStorage 모드'}
+    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-400">
+      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+      Supabase 연결됨
     </div>
   );
 }

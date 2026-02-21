@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { Card, Badge, Button, ScoreInput, ProgressRing } from '@/components/ui';
 import toast from 'react-hot-toast';
@@ -6,42 +6,62 @@ import toast from 'react-hot-toast';
 export default function EvalFormPage({ candidateId, onBack }) {
   const {
     currentUser, evaluators, candidates, criteriaSections, criteriaItems,
-    isExcluded, getSessionScores, getSessionComments,
+    isExcluded, getSessionSectionComments,
     saveScore, completeEvaluation,
   } = useStore();
 
   const evaluator = evaluators.find(e => e.id === currentUser);
   const candidate = candidates.find(c => c.id === candidateId);
   const excluded = isExcluded(currentUser, candidateId);
-  const sessionScores = getSessionScores(currentUser, candidateId);
-  const savedComments = getSessionComments(currentUser, candidateId);
-  const [comments, setComments] = useState(savedComments || '');
+  const scores = useStore(s => s.scores);
+  const sessions = useStore(s => s.sessions);
+  const sessionScores = useMemo(() => {
+    const session = sessions.find(s => s.evaluator_id === currentUser && s.candidate_id === candidateId);
+    return scores[session?.id] || {};
+  }, [scores, sessions, currentUser, candidateId]);
+
+  const [localScores, setLocalScores] = useState(() => ({}));
+  const savedSectionComments = getSessionSectionComments(currentUser, candidateId);
+  const [comments, setComments] = useState(() => savedSectionComments || { A: '', B: '', C: '' });
   const [saving, setSaving] = useState(false);
 
-  // Section totals
+  const effectiveScores = { ...sessionScores, ...localScores };
+
+  useEffect(() => {
+    setLocalScores({});
+  }, [candidateId, currentUser]);
+
+  // Section totals 및 allFilled: effectiveScores 사용 (로컬 즉시 반영)
   const sectionTotals = useMemo(() => {
     const totals = {};
     criteriaSections.forEach(sec => {
       const items = criteriaItems.filter(i => i.sectionId === sec.id);
-      totals[sec.id] = items.reduce((sum, item) => sum + (sessionScores[item.id] || 0), 0);
+      totals[sec.id] = items.reduce((sum, item) => sum + (Number(effectiveScores[item.id]) || 0), 0);
     });
     return totals;
-  }, [sessionScores, criteriaSections, criteriaItems]);
+  }, [effectiveScores, criteriaSections, criteriaItems]);
 
   const totalScore = useMemo(() =>
-    criteriaItems.reduce((sum, item) => sum + (sessionScores[item.id] || 0), 0)
-  , [sessionScores, criteriaItems]);
+    criteriaItems.reduce((sum, item) => sum + (Number(effectiveScores[item.id]) || 0), 0)
+  , [effectiveScores, criteriaItems]);
 
   const allFilled = useMemo(() =>
-    criteriaItems.every(item => sessionScores[item.id] != null)
-  , [sessionScores, criteriaItems]);
+    criteriaItems.every(item => {
+      const v = effectiveScores[item.id];
+      return v != null && v !== '' && !Number.isNaN(Number(v));
+    })
+  , [effectiveScores, criteriaItems]);
 
-  const handleScoreChange = async (itemId, value) => {
-    try {
-      await saveScore(currentUser, candidateId, itemId, value);
-    } catch (err) {
+  const handleScoreChange = (itemId, value) => {
+    setLocalScores(prev => ({ ...prev, [itemId]: value }));
+    saveScore(currentUser, candidateId, itemId, value).catch(err => {
       toast.error('점수 저장 실패: ' + err.message);
-    }
+      setLocalScores(prev => {
+        const next = { ...prev };
+        delete next[itemId];
+        return next;
+      });
+    });
   };
 
   const handleComplete = async () => {
@@ -137,7 +157,7 @@ export default function EvalFormPage({ candidateId, onBack }) {
                     <p className="text-[11px] text-slate-600 mb-3 ml-6">{item.description}</p>
                   )}
                   <ScoreInput
-                    value={sessionScores[item.id] ?? null}
+                    value={effectiveScores[item.id] ?? null}
                     max={item.maxScore}
                     onChange={(v) => handleScoreChange(item.id, v)}
                   />
@@ -148,16 +168,25 @@ export default function EvalFormPage({ candidateId, onBack }) {
         );
       })}
 
-      {/* Comments */}
+      {/* Section Comments */}
       <Card className="mb-5">
         <h3 className="text-[15px] font-bold text-white mb-3">📝 평가 코멘트 (선택)</h3>
-        <textarea
-          value={comments}
-          onChange={(e) => setComments(e.target.value)}
-          placeholder="응시자에 대한 종합 의견을 작성해 주세요..."
-          rows={4}
-          className="w-full px-4 py-3 rounded-xl border border-surface-500 bg-surface-100 text-white text-sm leading-relaxed resize-y outline-none focus:border-brand-500 transition-colors placeholder:text-slate-600"
-        />
+        <div className="space-y-4">
+          {criteriaSections.map(sec => (
+            <div key={sec.id}>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">
+                {sec.id}. {sec.label}
+              </label>
+              <textarea
+                value={comments[sec.id] ?? ''}
+                onChange={(e) => setComments(prev => ({ ...prev, [sec.id]: e.target.value }))}
+                placeholder={`${sec.label}에 대한 의견을 작성해 주세요...`}
+                rows={3}
+                className="w-full px-4 py-3 rounded-xl border border-surface-500 bg-surface-100 text-white text-sm leading-relaxed resize-y outline-none focus:border-brand-500 transition-colors placeholder:text-slate-600"
+              />
+            </div>
+          ))}
+        </div>
       </Card>
 
       {/* Actions */}
