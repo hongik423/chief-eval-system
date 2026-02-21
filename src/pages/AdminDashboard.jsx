@@ -17,6 +17,7 @@ const TABS = [
   { id: 'candidates', label: '응시자별 상세', icon: '👤' },
   { id: 'evaluators', label: '평가위원별 현황', icon: '🧑‍⚖️' },
   { id: 'reports', label: '평가보고서', icon: '📄' },
+  { id: 'archives', label: '보관 데이터', icon: '📦' },
   { id: 'criteria', label: '평가표 관리', icon: '⚙️' },
   { id: 'audit', label: '데이터 추적', icon: '📋' },
 ];
@@ -27,7 +28,8 @@ export default function AdminDashboard() {
     evaluators, candidates, criteriaSections, criteriaItems,
     bonusScores, sessions, scores, logout, getCandidateResult,
     saveBonusScore, updateCandidateStatus, resetAllData,
-    loadAuditLog, auditLog, updateCriteriaItem, addCriteriaItem,
+    loadAuditLog, auditLog, loadArchives, getArchiveDetail, getArchiveCandidateResults,
+    archives, archiveDetail, updateCriteriaItem, addCriteriaItem,
     setSelectedPeriod,     createPeriod, setPeriodStatus, addCandidate,
     addPeriodEvaluator, removePeriodEvaluator,
     allEvaluators,
@@ -41,7 +43,8 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (activeTab === 'audit') loadAuditLog();
-  }, [activeTab]);
+    if (activeTab === 'archives') loadArchives(selectedPeriodId);
+  }, [activeTab, selectedPeriodId]);
 
   // Candidate results (sessions/scores 변경 시에도 재계산)
   const candidateResults = useMemo(() =>
@@ -478,6 +481,17 @@ export default function AdminDashboard() {
         />
       )}
 
+      {/* ═══ TAB: Archives (보관 데이터) ═══ */}
+      {activeTab === 'archives' && (
+        <ArchiveTab
+          archives={archives}
+          archiveDetail={archiveDetail}
+          criteriaSections={criteriaSections}
+          onSelectArchive={getArchiveDetail}
+          getArchiveCandidateResults={getArchiveCandidateResults}
+        />
+      )}
+
       {/* ═══ TAB: Criteria Management ═══ */}
       {activeTab === 'criteria' && (
         <CriteriaManagement
@@ -822,6 +836,202 @@ function AddCandidateForm({ periodId, onAddCandidate }) {
           </div>
           <Button size="sm" onClick={handleAdd} disabled={adding}>{adding ? '추가 중...' : '추가'}</Button>
         </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── Archive Tab: 초기화 전 보관 데이터 조회 ───
+function ArchiveTab({ archives, archiveDetail, criteriaSections, onSelectArchive, getArchiveCandidateResults }) {
+  const [selectedArchiveId, setSelectedArchiveId] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSelect = async (archiveId) => {
+    setSelectedArchiveId(archiveId);
+    setExpandedId(null);
+    setLoading(true);
+    try {
+      await onSelectArchive(archiveId);
+    } catch (err) {
+      toast.error('아카이브 로드 실패: ' + err?.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const candidateResults = archiveDetail && selectedArchiveId
+    ? getArchiveCandidateResults(archiveDetail)
+    : [];
+
+  return (
+    <div className="space-y-4">
+      <Card className="!p-4 bg-surface-300/50">
+        <div className="text-sm text-slate-400">
+          <strong className="text-white">보관 데이터:</strong> 초기화 시 해당 기간 데이터가 자동으로 아카이브에 보관됩니다.
+          아래 목록에서 보관 시점을 선택해 과거 평가 데이터를 조회할 수 있습니다.
+        </div>
+      </Card>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {archives.map((a) => (
+          <Card
+            key={a.id}
+            onClick={() => handleSelect(a.id)}
+            className={`cursor-pointer transition-all !p-4
+              ${selectedArchiveId === a.id ? 'ring-2 ring-brand-500 bg-surface-300/50' : 'hover:bg-surface-300/30'}`}
+          >
+            <div className="font-semibold text-white">
+              {new Date(a.archived_at).toLocaleString('ko-KR')}
+            </div>
+            <div className="text-xs text-slate-500 mt-1 truncate">
+              {a.note || '초기화 전 보관'}
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {archives.length === 0 && (
+        <Card className="text-center py-12">
+          <div className="text-4xl mb-3">📦</div>
+          <div className="text-lg font-bold text-white mb-1">보관된 데이터 없음</div>
+          <div className="text-sm text-slate-400">초기화를 실행하면 해당 시점 데이터가 여기에 보관됩니다.</div>
+        </Card>
+      )}
+
+      {loading && (
+        <div className="flex justify-center py-8">
+          <Spinner size="md" />
+        </div>
+      )}
+
+      {!loading && selectedArchiveId && candidateResults.length > 0 && (
+        <div className="space-y-3 pt-4 border-t border-surface-500/30">
+          <SectionHeader>보관 당시 응시자별 결과</SectionHeader>
+          {candidateResults.map((result) => {
+            const isExpanded = expandedId === result.candidate.id;
+            return (
+              <Card key={result.candidate.id} className="!p-0 overflow-hidden">
+                <div
+                  onClick={() => setExpandedId(isExpanded ? null : result.candidate.id)}
+                  className="flex items-center gap-4 px-4 sm:px-6 py-4 cursor-pointer hover:bg-surface-300/30 transition-colors"
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-base font-bold shrink-0
+                    ${result.pass === true ? 'bg-emerald-500/10 text-emerald-400'
+                      : result.pass === false ? 'bg-red-500/10 text-red-400'
+                      : 'bg-surface-300 text-slate-500'}`}>
+                    {result.candidate.name[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[15px] font-bold text-white">{result.candidate.name}</div>
+                    <div className="text-xs text-slate-500">{result.candidate.team} · 평가완료 {result.evalCount}명</div>
+                  </div>
+                  {result.finalAvg != null && (
+                    <div className="text-right">
+                      <div className={`text-xl font-extrabold font-mono
+                        ${result.pass ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {result.finalAvg.toFixed(1)}
+                      </div>
+                      <div className="text-[10px] text-slate-500">평균</div>
+                    </div>
+                  )}
+                  <span className={`text-slate-500 text-sm transition-transform ${isExpanded ? 'rotate-90' : ''}`}>›</span>
+                </div>
+
+                {isExpanded && (
+                  <div className="px-4 sm:px-6 pb-5 border-t border-surface-500/20">
+                    <div className="overflow-x-auto mt-4">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-surface-500/40">
+                            <th className="text-left py-2 px-3 text-[11px] text-slate-500 font-semibold">평가위원</th>
+                            {criteriaSections.map(sec => (
+                              <th key={sec.id} className="text-center py-2 px-2 text-[11px] text-slate-500 font-semibold">
+                                {sec.id}영역 ({sec.maxScore})
+                              </th>
+                            ))}
+                            <th className="text-center py-2 px-3 text-[11px] text-slate-500 font-semibold">합계</th>
+                            <th className="text-center py-2 px-3 text-[11px] text-slate-500 font-semibold">상태</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {result.evaluatorDetails.map(ed => (
+                            <tr key={ed.evaluator.id} className={`border-b border-surface-500/10 ${ed.isSameTeam ? 'opacity-30' : ''}`}>
+                              <td className="py-3 px-3 font-semibold text-white">
+                                {ed.evaluator.name}
+                                {ed.isSameTeam && <span className="text-[10px] text-slate-500 ml-1.5">(제외)</span>}
+                              </td>
+                              {criteriaSections.map(sec => (
+                                <td key={sec.id} className="text-center py-3 px-2 font-mono font-semibold text-white">
+                                  {ed.isSameTeam ? '—' : (ed.sectionBreakdown[sec.id] ?? '—')}
+                                </td>
+                              ))}
+                              <td className="text-center py-3 px-3 font-mono font-bold text-brand-400">
+                                {ed.isSameTeam ? '—' : ed.totalScore}
+                              </td>
+                              <td className="text-center py-3 px-3">
+                                {ed.isSameTeam ? <Badge variant="muted">제외</Badge>
+                                  : ed.isComplete ? <Badge variant="green">완료</Badge>
+                                  : <Badge variant="muted">미평가</Badge>}
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="bg-yellow-500/5">
+                            <td className="py-3 px-3 text-yellow-400 font-semibold text-xs">가점</td>
+                            <td colSpan={criteriaSections.length} />
+                            <td className="text-center py-3 px-3 text-yellow-400 font-mono font-bold">{result.bonus || '—'}</td>
+                            <td />
+                          </tr>
+                          {result.finalAvg != null && (
+                            <tr className={result.pass ? 'bg-emerald-500/5' : 'bg-red-500/5'}>
+                              <td className="py-3 px-3 font-bold text-white text-sm">최종 평균</td>
+                              <td colSpan={criteriaSections.length} />
+                              <td className={`text-center py-3 px-3 text-lg font-extrabold font-mono
+                                ${result.pass ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {result.finalAvg.toFixed(1)}
+                              </td>
+                              <td>
+                                <Badge variant={result.pass ? 'green' : 'red'}>
+                                  {result.pass ? '합격' : '미달'}
+                                </Badge>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {result.evaluatorDetails.some(ed => {
+                      const cs = ed.commentsSection || {};
+                      const hasAny = criteriaSections.some(sec => (cs[sec.id] || '').trim()) || (ed.comments || '').trim();
+                      return hasAny && !ed.isSameTeam;
+                    }) && (
+                      <div className="mt-4">
+                        <div className="text-[11px] font-semibold text-slate-500 mb-2">평가 코멘트</div>
+                        <div className="space-y-2">
+                          {result.evaluatorDetails.filter(ed => !ed.isSameTeam).map(ed => {
+                            const cs = ed.commentsSection || {};
+                            const hasAny = criteriaSections.some(sec => (cs[sec.id] || '').trim()) || (ed.comments || '').trim();
+                            if (!hasAny) return null;
+                            return (
+                              <div key={ed.evaluator.id} className="px-4 py-3 rounded-lg bg-surface-100 border border-surface-500/20 text-xs text-slate-400">
+                                <span className="font-semibold text-brand-400">{ed.evaluator.name}</span>
+                                {criteriaSections.map(sec => {
+                                  const comment = (cs[sec.id] || '').trim();
+                                  return comment ? <div key={sec.id} className="mt-1"><span className="text-slate-600">{sec.id}.</span> {comment}</div> : null;
+                                })}
+                                {ed.comments && <div className="mt-1 font-medium text-slate-300">종합: {ed.comments}</div>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
       )}
     </div>
   );

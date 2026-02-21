@@ -31,6 +31,8 @@ export const useStore = create((set, get) => ({
   scores: {},             // { sessionId: { itemId: score } }
   bonusScores: {},        // { candidateId: score }
   auditLog: [],
+  archives: [],        // [{ id, period_id, archived_at, note }]
+  archiveDetail: null, // 선택한 아카이브 상세 (sessions, scores, bonus 재구성)
   periodInfo: null,     // DB에서 로드한 평가 기간 정보 (pass_score 등)
   loading: true,
   error: null,
@@ -416,6 +418,70 @@ export const useStore = create((set, get) => ({
     };
   },
 
+  /** 아카이브 데이터로 응시자별 결과 재계산 (조회 전용) */
+  getArchiveCandidateResults: (archiveDetail) => {
+    const { evaluators, candidates, criteriaItems, criteriaSections, periodInfo } = get();
+    if (!archiveDetail?.sessions?.length) return [];
+
+    const { sessions, scores, bonusScores } = archiveDetail;
+    const candidateIds = [...new Set(sessions.map(s => s.candidate_id))];
+
+    return candidateIds.map(candidateId => {
+      const candidate = candidates.find(c => c.id === candidateId) || {
+        id: candidateId,
+        name: candidateId,
+        team: '—',
+      };
+      const bonus = Number(bonusScores[candidateId]) || 0;
+      let evalCount = 0;
+      let totalSum = 0;
+      const evaluatorDetails = [];
+
+      evaluators.forEach(ev => {
+        const isSameTeam = ev.team === candidate.team && ev.team !== '대표';
+        const session = sessions.find(s => s.evaluator_id === ev.id && s.candidate_id === candidateId);
+        const sessionScores = scores[session?.id] || {};
+        const isComplete = session?.status === 'completed' ||
+          (!session?.status && criteriaItems.every(item => sessionScores[item.id] != null));
+
+        const sectionBreakdown = {};
+        criteriaSections.forEach(sec => {
+          const sectionItems = criteriaItems.filter(i => i.sectionId === sec.id);
+          sectionBreakdown[sec.id] = sectionItems.reduce((s, item) => s + (Number(sessionScores[item.id]) || 0), 0);
+        });
+        const evTotal = criteriaItems.reduce((s, item) => s + (Number(sessionScores[item.id]) || 0), 0);
+
+        if (!isSameTeam && isComplete) {
+          evalCount++;
+          totalSum += evTotal;
+        }
+
+        const cs = session?.comments_section || {};
+        const commentsSection = criteriaSections.reduce((acc, sec) => {
+          acc[sec.id] = (cs && cs[sec.id]) || '';
+          return acc;
+        }, {});
+        evaluatorDetails.push({
+          evaluator: ev,
+          isSameTeam,
+          isComplete,
+          totalScore: evTotal,
+          sectionBreakdown,
+          comments: session?.comments || null,
+          commentsSection,
+          completedAt: session?.completed_at || null,
+          sessionScores,
+        });
+      });
+
+      const passScore = periodInfo?.passScore ?? PASS_SCORE;
+      const finalAvg = evalCount > 0 ? (Number(totalSum) + Number(bonus)) / evalCount : null;
+      const pass = finalAvg !== null ? finalAvg >= passScore : null;
+
+      return { candidate, bonus, evalCount, totalSum, finalAvg, pass, evaluatorDetails };
+    }).filter(Boolean);
+  },
+
   // ═══════════════════════════════
   // Get evaluator scores for a candidate
   // ═══════════════════════════════
@@ -523,12 +589,177 @@ export const useStore = create((set, get) => ({
   },
 
   // ═══════════════════════════════
-  // Reset (admin only)
+  // Archive (초기화 전 데이터 보관)
+  // ═══════════════════════════════
+  archiveCurrentPeriod: async (periodId) => {
+    const pid = periodId || get().periodInfo?.id || get().selectedPeriodId || CURRENT_PERIOD_ID;
+
+    // 1) 해당 기간 세션 조회
+    const { data: sessions, error: sessErr } = await supabase
+      .from('chief_evaluation_sessions')
+      .select('*')
+      .eq('period_id', pid);
+    if (sessErr) throw sessErr;
+    if (!sessions || sessions.length === 0) return null;
+
+    const sessionIds = sessions.map(s => s.id);
+
+    // 2) 해당 세션들의 점수 조회
+    const { data: scores, error: scoreErr } = await supabase
+      .from('chief_evaluation_scores')
+      .select('*')
+      .in('session_id', sessionIds);
+    if (scoreErr) throw scoreErr;
+
+    // 3) 가점 조회
+    const { data: bonusData, error: bonusErr } = await supabase
+      .from('chief_bonus_scores')
+      .select('*')
+      .eq('period_id', pid);
+    if (bonusErr) throw bonusErr;
+
+    // 4) 아카이브 메타 생성
+    const { data: meta, error: metaErr } = await supabase
+      .from('chief_archive_meta')
+      .insert({ period_id: pid, note: `초기화 전 보관 (${new Date().toLocaleString('ko-KR')})` })
+      .select()
+      .single();
+    if (metaErr) throw metaErr;
+    const archiveId = meta.id;
+
+    // 5) 세션 아카이브 (original_session_id 매핑)
+    const sessionMap = {};
+    for (const s of sessions) {
+      const { data: archSess, error: insErr } = await supabase
+        .from('chief_evaluation_sessions_archive')
+        .insert({
+          archive_id: archiveId,
+          original_session_id: s.id,
+          period_id: s.period_id,
+          evaluator_id: s.evaluator_id,
+          candidate_id: s.candidate_id,
+          status: s.status,
+          is_excluded: s.is_excluded,
+          total_score: s.total_score,
+          comments: s.comments,
+          comments_section: s.comments_section || {},
+          completed_at: s.completed_at,
+        })
+        .select()
+        .single();
+      if (insErr) throw insErr;
+      sessionMap[s.id] = archSess.id;
+    }
+
+    // 6) 점수 아카이브
+    for (const sc of scores || []) {
+      const sessionArchiveId = sessionMap[sc.session_id];
+      if (!sessionArchiveId) continue;
+      const { error: scErr } = await supabase
+        .from('chief_evaluation_scores_archive')
+        .insert({
+          archive_id: archiveId,
+          session_archive_id: sessionArchiveId,
+          criteria_item_id: sc.criteria_item_id,
+          score: sc.score,
+        });
+      if (scErr) throw scErr;
+    }
+
+    // 7) 가점 아카이브
+    for (const b of bonusData || []) {
+      const { error: bErr } = await supabase
+        .from('chief_bonus_scores_archive')
+        .insert({
+          archive_id: archiveId,
+          period_id: b.period_id,
+          candidate_id: b.candidate_id,
+          score: b.score,
+          coach_id: b.coach_id,
+        });
+      if (bErr) throw bErr;
+    }
+
+    return archiveId;
+  },
+
+  loadArchives: async (periodId) => {
+    const pid = periodId || get().selectedPeriodId;
+    if (!pid) return;
+    try {
+      const { data, error } = await supabase
+        .from('chief_archive_meta')
+        .select('id, period_id, archived_at, note')
+        .eq('period_id', pid)
+        .order('archived_at', { ascending: false });
+      if (error) throw error;
+      set({ archives: data || [] });
+    } catch (err) {
+      console.warn('아카이브 로드 실패 (테이블 미생성 시 무시):', err);
+      set({ archives: [] });
+    }
+  },
+
+  getArchiveDetail: async (archiveId) => {
+    const [sessRes, bonusRes] = await Promise.all([
+      supabase.from('chief_evaluation_sessions_archive').select('*').eq('archive_id', archiveId),
+      supabase.from('chief_bonus_scores_archive').select('*').eq('archive_id', archiveId),
+    ]);
+    if (sessRes.error) throw sessRes.error;
+    if (bonusRes.error) throw bonusRes.error;
+
+    const sessions = sessRes.data || [];
+    const sessionIds = sessions.map(s => s.id);
+
+    const { data: scores } = await supabase
+      .from('chief_evaluation_scores_archive')
+      .select('*')
+      .in('session_archive_id', sessionIds);
+
+    const scoresMap = {};
+    (scores || []).forEach((s) => {
+      if (!scoresMap[s.session_archive_id]) scoresMap[s.session_archive_id] = {};
+      scoresMap[s.session_archive_id][s.criteria_item_id] = Number(s.score) || 0;
+    });
+
+    const bonusMap = {};
+    (bonusRes.data || []).forEach((b) => {
+      bonusMap[b.candidate_id] = Number(b.score) || 0;
+    });
+
+    const detail = {
+      sessions,
+      scores: scoresMap,
+      bonusScores: bonusMap,
+    };
+    set({ archiveDetail: detail });
+    return detail;
+  },
+
+  // ═══════════════════════════════
+  // Reset (admin only) - 초기화 전 아카이브 자동 보관
   // ═══════════════════════════════
   resetAllData: async () => {
     const state = get();
     const periodId = state.periodInfo?.id || state.selectedPeriodId || CURRENT_PERIOD_ID;
-    await supabase.from('chief_evaluation_scores').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+    // 초기화 전 해당 기간 데이터 아카이브
+    try {
+      await get().archiveCurrentPeriod(periodId);
+    } catch (err) {
+      console.warn('아카이브 실패 (테이블 미생성 시 무시):', err);
+    }
+
+    // 해당 기간 세션 ID 목록 (점수 삭제용)
+    const { data: periodSessions } = await supabase
+      .from('chief_evaluation_sessions')
+      .select('id')
+      .eq('period_id', periodId);
+    const sessionIds = (periodSessions || []).map(s => s.id);
+
+    if (sessionIds.length > 0) {
+      await supabase.from('chief_evaluation_scores').delete().in('session_id', sessionIds);
+    }
     await supabase.from('chief_evaluation_sessions')
       .update({ status: 'pending', total_score: null, comments: null, comments_section: {}, completed_at: null })
       .eq('period_id', periodId);
@@ -539,8 +770,9 @@ export const useStore = create((set, get) => ({
       .update({ status: 'registered' })
       .eq('period_id', periodId);
 
-    set({ sessions: [], scores: {}, bonusScores: {} });
+    set({ sessions: [], scores: {}, bonusScores: {}, archiveDetail: null });
     await get().loadFromSupabase(periodId);
+    await get().loadArchives(periodId);
   },
 
   createPeriod: async (input) => {
