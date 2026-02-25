@@ -11,10 +11,74 @@ import AdminDashboard from '@/pages/AdminDashboard';
 export default function App() {
   const { currentUser, isAdmin, loading, error, initialize } = useStore();
   const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [showTestSelectionBanner, setShowTestSelectionBanner] = useState(false);
 
   useEffect(() => {
     initialize();
   }, []);
+
+  useEffect(() => {
+    if (currentUser && !isAdmin) {
+      // 접속 직후(로그인 후) TEST 문제선정 배너를 우선 노출
+      setShowTestSelectionBanner(true);
+    } else {
+      setShowTestSelectionBanner(false);
+    }
+  }, [currentUser, isAdmin]);
+
+  const testSelectionPhaseBanner = showTestSelectionBanner ? (
+    <div className="fixed inset-0 z-[85] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="w-full max-w-[620px] rounded-2xl border border-amber-700/40 overflow-hidden shadow-2xl bg-surface-100">
+        <div
+          className="px-6 py-6 text-center"
+          style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
+        >
+          <div className="text-3xl mb-2">📢</div>
+          <h2 className="text-2xl font-extrabold text-surface-0">TEST 케이스 문제 선정 공지</h2>
+          <p className="text-sm text-surface-0/80 mt-1">
+            현재는 TEST 문제선정 단계입니다. 먼저 진행해 주세요.
+          </p>
+        </div>
+
+        <div className="p-5 sm:p-6 space-y-3">
+          <div className="rounded-xl border border-blue-700/40 bg-blue-950/30 px-4 py-3">
+            <p className="text-xs text-blue-300 font-semibold">진행 안내</p>
+            <p className="text-sm text-blue-200/90 mt-1">
+              상단 네비바 중간 <span className="font-bold">[🗳️ TEST 문제 선정]</span> 버튼을 클릭해
+              문제 선정을 먼저 완료해 주세요.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-surface-500/40 bg-surface-200/30 px-4 py-3">
+            <p className="text-xs text-slate-300 font-semibold mb-2">문제 선정 진행 순서</p>
+            <ol className="text-sm text-slate-200 space-y-1 list-decimal pl-4">
+              <li>상단 네비바 중간 [TEST 문제 선정] 클릭</li>
+              <li>3개 분야 각 1문제 선택 후 제출</li>
+              <li>결과 대시보드 확인</li>
+            </ol>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => { window.location.href = '/question-selection'; }}
+              className="w-full py-3 rounded-xl font-bold text-surface-0 hover:opacity-90 transition"
+              style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
+            >
+              TEST 문제 선정 바로가기 →
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowTestSelectionBanner(false)}
+              className="w-full py-3 rounded-xl font-semibold text-slate-300 bg-surface-200 hover:bg-surface-300 transition"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   if (loading) {
     return (
@@ -70,6 +134,7 @@ export default function App() {
           className: 'toast-custom',
           style: { background: '#1C2536', color: '#E8ECF4', border: '1px solid #243044' },
         }} />
+        {testSelectionPhaseBanner}
         <AppNav />
         <AdminDashboard />
       </div>
@@ -84,6 +149,7 @@ export default function App() {
           className: 'toast-custom',
           style: { background: '#1C2536', color: '#E8ECF4', border: '1px solid #243044' },
         }} />
+        {testSelectionPhaseBanner}
         <AppNav />
         <EvalFormPage
           candidateId={selectedCandidate}
@@ -100,6 +166,7 @@ export default function App() {
         className: 'toast-custom',
         style: { background: '#1C2536', color: '#E8ECF4', border: '1px solid #243044' },
       }} />
+      {testSelectionPhaseBanner}
       <AppNav />
       <EvaluatorDashboard onSelectCandidate={setSelectedCandidate} />
     </div>
