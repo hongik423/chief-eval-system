@@ -7,7 +7,8 @@ import AnnouncementModal from '@/components/AnnouncementModal';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
-  const [manualOpen, setManualOpen] = useState(false);
+  // 접속 직후 TEST 문제 선정 사용자 매뉴얼 자동 노출
+  const [manualOpen, setManualOpen] = useState(true);
   const [announcementOpen, setAnnouncementOpen] = useState(false);
   const { evaluators, allEvaluators, loginWithPassword } = useStore();
   const loginEvaluators = evaluators?.length > 0 ? evaluators : (allEvaluators || []);

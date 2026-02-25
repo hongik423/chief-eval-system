@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui';
 
 const EVALUATOR_MANUAL = [
+  { title: '0. TEST 문제 선정 이동(사전 안내)', content: '로그인 완료 후 상단 네비바 가운데의 [🗳️ TEST 문제 선정] 버튼을 먼저 클릭해 문제 선정 페이지로 이동합니다. 문제 선정을 마친 뒤 본 평가 화면으로 돌아와 평가를 진행하세요.' },
   { title: '1. 로그인', content: '로그인 화면에서 본인(평가위원) 아이디를 선택하고, 비밀번호를 입력한 뒤 [평가 시작]을 클릭합니다. 초기 비밀번호는 아이디와 동일합니다(예: ndh/ndh).' },
   { title: '2. 대시보드', content: '평가 대상 응시자 4명이 카드로 표시됩니다. 각 카드의 [평가하기] 버튼을 클릭하면 해당 응시자의 평가 폼으로 이동합니다.' },
   { title: '3. 평가 방식', content: '평가는 3개 역량 영역(A·B·C)으로 구성되며, 총 9개 항목·100점 만점입니다. A. 세무사 협력 커뮤니케이션 역량(50점), B. 고객 솔루션 제안 역량(30점), C. 프로젝트 설계 및 실무 역량(20점)입니다. 가점(최대 10점)은 별도 적용되어 110점 만점으로 최종 산정됩니다. 평균 70점 이상 시 합격입니다.' },
@@ -60,6 +61,16 @@ export default function ManualModal({ open, onClose, isAdmin }) {
         </div>
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {tab === 'evaluator' && (
+            <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3">
+              <p className="text-xs font-semibold text-blue-300 mb-1">TEST 문제 선정 전단계 안내</p>
+              <p className="text-xs text-blue-200/90 leading-relaxed">
+                로그인 후 상단 네비바 <span className="font-bold">중간</span>의
+                <span className="font-bold"> [🗳️ TEST 문제 선정]</span> 버튼을 눌러
+                문제 선정을 먼저 완료해 주세요.
+              </p>
+            </div>
+          )}
           <p className="text-sm text-slate-400 mb-6">
             {tab === 'evaluator' ? '평가위원이 평가를 진행하는 방법을 안내합니다.' : '관리자가 대시보드와 평가 관리를 수행하는 방법을 안내합니다.'}
           </p>
