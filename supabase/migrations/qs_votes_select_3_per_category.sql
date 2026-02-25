@@ -3,30 +3,124 @@
 -- 기존 INTEGER 컬럼을 INTEGER[] 컬럼으로 변환
 -- ================================================================
 
--- 1) 기존 단일 선택값을 배열(1개)로 변환
+-- 1) 기존 체크 제약 제거 (중요: 타입 변경 전에 먼저 제거해야 함)
+ALTER TABLE qs_votes DROP CONSTRAINT IF EXISTS qs_votes_stock_transfer_check;
+ALTER TABLE qs_votes DROP CONSTRAINT IF EXISTS qs_votes_nominee_stock_check;
+ALTER TABLE qs_votes DROP CONSTRAINT IF EXISTS qs_votes_temporary_payment_check;
+
+-- 2) 기존 단일 선택값을 배열(1개)로 변환
 ALTER TABLE qs_votes
   ALTER COLUMN stock_transfer TYPE INTEGER[] USING ARRAY[stock_transfer],
   ALTER COLUMN nominee_stock TYPE INTEGER[] USING ARRAY[nominee_stock],
   ALTER COLUMN temporary_payment TYPE INTEGER[] USING ARRAY[temporary_payment];
 
--- 2) 기존 체크 제약 제거
-ALTER TABLE qs_votes DROP CONSTRAINT IF EXISTS qs_votes_stock_transfer_check;
-ALTER TABLE qs_votes DROP CONSTRAINT IF EXISTS qs_votes_nominee_stock_check;
-ALTER TABLE qs_votes DROP CONSTRAINT IF EXISTS qs_votes_temporary_payment_check;
-
--- 3) 기존 데이터가 길이 1 배열인 경우, 운영 정책(길이 3)을 위해 임시로 첫값을 3개 복제
---    이후 코치 재선택(재투표) 시 정상 3개 서로 다른 값으로 갱신 가능
+-- 3) 기존 데이터 정규화
+--    - 허용 번호만 유지
+--    - 중복 제거
+--    - 3개 미만이면 허용 목록에서 부족분을 채워 정확히 3개로 보정
 UPDATE qs_votes
-SET
-  stock_transfer = ARRAY[stock_transfer[1], stock_transfer[1], stock_transfer[1]],
-  nominee_stock = ARRAY[nominee_stock[1], nominee_stock[1], nominee_stock[1]],
-  temporary_payment = ARRAY[temporary_payment[1], temporary_payment[1], temporary_payment[1]]
-WHERE
-  cardinality(stock_transfer) = 1
-  OR cardinality(nominee_stock) = 1
-  OR cardinality(temporary_payment) = 1;
+SET stock_transfer = CASE
+  WHEN stock_transfer IS NULL OR cardinality(stock_transfer) = 0 THEN ARRAY[4, 5, 7]
+  ELSE (
+    WITH cleaned AS (
+      SELECT ARRAY(
+        SELECT DISTINCT x
+        FROM unnest(stock_transfer) AS x
+        WHERE x = ANY (ARRAY[4, 5, 7, 9, 12, 16, 19])
+        ORDER BY x
+      ) AS arr
+    )
+    SELECT CASE
+      WHEN cardinality(arr) >= 3 THEN arr[1:3]
+      WHEN cardinality(arr) = 2 THEN arr || ARRAY(
+        SELECT v
+        FROM unnest(ARRAY[4, 5, 7, 9, 12, 16, 19]) AS v
+        WHERE NOT (v = ANY(arr))
+        ORDER BY v
+        LIMIT 1
+      )
+      WHEN cardinality(arr) = 1 THEN arr || ARRAY(
+        SELECT v
+        FROM unnest(ARRAY[4, 5, 7, 9, 12, 16, 19]) AS v
+        WHERE NOT (v = ANY(arr))
+        ORDER BY v
+        LIMIT 2
+      )
+      ELSE ARRAY[4, 5, 7]
+    END
+    FROM cleaned
+  )
+END;
 
--- 4) 새 정책 체크 제약 추가 (각 영역 정확히 3문제, 허용 번호만 선택)
+UPDATE qs_votes
+SET nominee_stock = CASE
+  WHEN nominee_stock IS NULL OR cardinality(nominee_stock) = 0 THEN ARRAY[1, 3, 8]
+  ELSE (
+    WITH cleaned AS (
+      SELECT ARRAY(
+        SELECT DISTINCT x
+        FROM unnest(nominee_stock) AS x
+        WHERE x = ANY (ARRAY[1, 3, 8, 10, 13, 17, 20])
+        ORDER BY x
+      ) AS arr
+    )
+    SELECT CASE
+      WHEN cardinality(arr) >= 3 THEN arr[1:3]
+      WHEN cardinality(arr) = 2 THEN arr || ARRAY(
+        SELECT v
+        FROM unnest(ARRAY[1, 3, 8, 10, 13, 17, 20]) AS v
+        WHERE NOT (v = ANY(arr))
+        ORDER BY v
+        LIMIT 1
+      )
+      WHEN cardinality(arr) = 1 THEN arr || ARRAY(
+        SELECT v
+        FROM unnest(ARRAY[1, 3, 8, 10, 13, 17, 20]) AS v
+        WHERE NOT (v = ANY(arr))
+        ORDER BY v
+        LIMIT 2
+      )
+      ELSE ARRAY[1, 3, 8]
+    END
+    FROM cleaned
+  )
+END;
+
+UPDATE qs_votes
+SET temporary_payment = CASE
+  WHEN temporary_payment IS NULL OR cardinality(temporary_payment) = 0 THEN ARRAY[2, 6, 11]
+  ELSE (
+    WITH cleaned AS (
+      SELECT ARRAY(
+        SELECT DISTINCT x
+        FROM unnest(temporary_payment) AS x
+        WHERE x = ANY (ARRAY[2, 6, 11, 14, 15, 18, 21])
+        ORDER BY x
+      ) AS arr
+    )
+    SELECT CASE
+      WHEN cardinality(arr) >= 3 THEN arr[1:3]
+      WHEN cardinality(arr) = 2 THEN arr || ARRAY(
+        SELECT v
+        FROM unnest(ARRAY[2, 6, 11, 14, 15, 18, 21]) AS v
+        WHERE NOT (v = ANY(arr))
+        ORDER BY v
+        LIMIT 1
+      )
+      WHEN cardinality(arr) = 1 THEN arr || ARRAY(
+        SELECT v
+        FROM unnest(ARRAY[2, 6, 11, 14, 15, 18, 21]) AS v
+        WHERE NOT (v = ANY(arr))
+        ORDER BY v
+        LIMIT 2
+      )
+      ELSE ARRAY[2, 6, 11]
+    END
+    FROM cleaned
+  )
+END;
+
+-- 4) 새 정책 체크 제약 추가 (각 영역 정확히 3문제, 중복 없이, 허용 번호만 선택)
 ALTER TABLE qs_votes
   ADD CONSTRAINT qs_votes_stock_transfer_check
   CHECK (
