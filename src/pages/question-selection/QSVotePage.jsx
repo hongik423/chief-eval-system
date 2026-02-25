@@ -39,8 +39,9 @@ export default function QSVotePage() {
           CATEGORY_KEYS.forEach((key) => {
             const saved = prev[key];
             const savedIds = Array.isArray(saved) ? saved : saved ? [saved] : [];
-            const validIds = savedIds
-              .filter((id) => QS_CATEGORIES[key].questionIds.includes(id))
+            const validIds = Array.from(
+              new Set(savedIds.filter((id) => QS_CATEGORIES[key].questionIds.includes(id)))
+            )
               .slice(0, REQUIRED_PER_CATEGORY);
             validated[key] = validIds;
           });

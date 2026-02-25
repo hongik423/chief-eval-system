@@ -170,7 +170,8 @@ export async function getResults() {
         voteCount: data.count,
         voters: data.voters,
       }))
-      .sort((a, b) => b.voteCount - a.voteCount);
+      // 동점 정렬 안정화: 득표수 내림차순, 동점 시 문제번호 오름차순
+      .sort((a, b) => (b.voteCount - a.voteCount) || (a.questionId - b.questionId));
 
     return {
       category: type,
