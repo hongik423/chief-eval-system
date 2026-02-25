@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { QS_CATEGORIES, QS_QUESTIONS } from '@/data/qsQuestions';
 import { getVoteStatus, getResults } from '@/lib/qsVoteStore';
 
-const ALL_EVALUATORS = ['평가위원장', '권영도', '권오경', '김홍', '박성현', '윤덕상', '하상현'];
+const ALL_EVALUATORS = ['나동환', '권영도', '권오경', '김홍', '박성현', '윤덕상', '하상현'];
 const CATEGORY_KEYS = Object.keys(QS_CATEGORIES);
 
 export default function QSResultsPage() {
@@ -50,6 +50,8 @@ export default function QSResultsPage() {
 
   const progressPct = ((status?.votedCount || 0) / 7) * 100;
   const isMajority = (status?.votedCount || 0) >= 4;
+  // results는 항상 3개 카테고리 배열이므로 실제 투표 존재 여부로 판단
+  const hasAnyVotes = results.some((r) => r.allVotes.length > 0);
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -138,7 +140,7 @@ export default function QSResultsPage() {
       </div>
 
       {/* 분야별 결과 */}
-      {results.length > 0 ? (
+      {hasAnyVotes ? (
         <div className="space-y-6">
           <h2 className="text-lg font-bold text-slate-900">
             📊 분야별 투표 결과 (최다득표 순)
@@ -210,10 +212,10 @@ export default function QSResultsPage() {
                             {/* 문제 정보 */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                                  isTop3 ? `${cat.lightBg} ${cat.textColor}` : 'bg-slate-100 text-slate-500'
+                                <span className={`text-sm font-extrabold px-2 py-0.5 rounded border ${
+                                  isTop3 ? `${cat.lightBg} ${cat.textColor} border-current` : 'bg-slate-100 text-slate-600 border-slate-300'
                                 }`}>
-                                  {vote.questionId}번
+                                  #{vote.questionId}
                                 </span>
                                 {isTop3 && (
                                   <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
@@ -222,9 +224,9 @@ export default function QSResultsPage() {
                                 )}
                               </div>
                               <h4 className={`font-bold text-sm mb-1 ${isTop3 ? cat.textColor : 'text-slate-700'}`}>
-                                {q?.title || `문제 ${vote.questionId}`}
+                                {q?.title || `문제 ${vote.questionId}번`}
                               </h4>
-                              {q && (
+                              {q?.issue && (
                                 <p className="text-xs text-slate-400 mb-1">{q.issue}</p>
                               )}
                               <div className="text-xs text-slate-400">
@@ -299,8 +301,8 @@ export default function QSResultsPage() {
                                   {i + 1}
                                 </span>
                                 <div>
-                                  <span className="text-xs font-bold text-slate-700">
-                                    {q.questionId}번
+                                  <span className="text-xs font-extrabold text-slate-800">
+                                    #{q.questionId}
                                   </span>
                                   <span className="text-xs text-slate-500 ml-1">
                                     ({q.voteCount}표)
