@@ -33,6 +33,12 @@ export default function AppNav() {
           {/* Nav Links - 로그인 시에만 */}
           {currentUser && (
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <a
+                href="/question-selection"
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors min-h-[44px] sm:min-h-0 sm:py-1"
+              >
+                🗳️ <span className="hidden sm:inline">TEST 문제 선정</span>
+              </a>
               <Button variant="ghost" size="sm" onClick={() => setAnnouncementOpen(true)} className="min-h-[44px] sm:min-h-0">
                 공고
               </Button>
