@@ -7,8 +7,9 @@ import AnnouncementModal from '@/components/AnnouncementModal';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
-  // 접속 직후 TEST 문제 선정 사용자 매뉴얼 자동 노출
-  const [manualOpen, setManualOpen] = useState(true);
+  // 접속 직후 공지 배너를 최상위로 먼저 노출
+  const [introBannerOpen, setIntroBannerOpen] = useState(true);
+  const [manualOpen, setManualOpen] = useState(false);
   const [announcementOpen, setAnnouncementOpen] = useState(false);
   const { evaluators, allEvaluators, loginWithPassword } = useStore();
   const loginEvaluators = evaluators?.length > 0 ? evaluators : (allEvaluators || []);
@@ -56,8 +57,59 @@ export default function LoginPage() {
     setPassword('');
   };
 
+  const handleConfirmIntroBanner = () => {
+    setIntroBannerOpen(false);
+    setManualOpen(true);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-0 via-[#0D1520] to-[#0F1A2C] py-6 px-4 sm:px-6">
+      {introBannerOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-[620px] rounded-2xl border border-amber-700/40 overflow-hidden shadow-2xl bg-surface-100">
+            <div
+              className="px-6 py-6 text-center"
+              style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
+            >
+              <div className="text-3xl mb-2">📢</div>
+              <h2 className="text-2xl font-extrabold text-surface-0">TEST 케이스 문제 선정 공지</h2>
+              <p className="text-sm text-surface-0/80 mt-1">로그인 후 상단 네비바 중간 [TEST 문제 선정]을 먼저 진행해 주세요.</p>
+            </div>
+
+            <div className="p-5 sm:p-6 space-y-3">
+              <div className="rounded-xl border border-red-700/40 bg-red-950/40 px-4 py-3">
+                <p className="text-xs text-red-300 font-semibold">⏰ 투표 마감 시간</p>
+                <p className="text-base sm:text-lg font-bold text-red-200 mt-1">내일 (2월 26일 목요일) 오전 12시까지</p>
+              </div>
+
+              <div className="rounded-xl border border-blue-700/40 bg-blue-950/30 px-4 py-3">
+                <p className="text-xs text-blue-300 font-semibold">📣 오후 일정 안내</p>
+                <p className="text-sm text-blue-200/90 mt-1">투표 종료 후 오후에 인증후보자에게 확정 문제 출제를 고지합니다.</p>
+              </div>
+
+              <div className="rounded-xl border border-surface-500/40 bg-surface-200/30 px-4 py-3">
+                <p className="text-xs text-slate-300 font-semibold mb-2">문제 선정 진행 순서</p>
+                <ol className="text-sm text-slate-200 space-y-1 list-decimal pl-4">
+                  <li>로그인</li>
+                  <li>상단 네비바 중간 <span className="font-bold">[TEST 문제 선정]</span> 클릭</li>
+                  <li>3개 분야 각 1문제 선택 후 제출</li>
+                  <li>대시보드에서 결과 확인</li>
+                </ol>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleConfirmIntroBanner}
+                className="w-full mt-2 py-3 rounded-xl font-bold text-surface-0 hover:opacity-90 transition"
+                style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
+              >
+                확인했습니다 · 평가자 매뉴얼 보기 →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-[520px] px-2 sm:px-4">
         {/* Logo & Title */}
         <div className="text-center mb-10">
