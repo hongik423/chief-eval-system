@@ -3,47 +3,42 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-// 카테고리 정의
 const CATEGORIES = [
   {
     key: 'stock_transfer',
     label: '주식 이동 프로젝트 설계',
-    icon: '📊',
     color: 'blue',
-    bgGradient: 'from-blue-500 to-blue-700',
-    lightBg: 'bg-blue-50',
+    bgGradient: 'from-blue-700 to-blue-900',
+    darkBg: 'bg-blue-950/30',
     borderColor: 'border-blue-500',
-    textColor: 'text-blue-700',
-    ringColor: 'ring-blue-200',
+    textColor: 'text-blue-400',
+    ringColor: 'ring-blue-700/50',
     questionIds: [1, 2, 3, 4, 5, 6, 7],
   },
   {
     key: 'nominee_stock',
     label: '차명 주식 해소 프로젝트 설계',
-    icon: '🔐',
     color: 'purple',
-    bgGradient: 'from-purple-500 to-purple-700',
-    lightBg: 'bg-purple-50',
+    bgGradient: 'from-purple-700 to-purple-900',
+    darkBg: 'bg-purple-950/30',
     borderColor: 'border-purple-500',
-    textColor: 'text-purple-700',
-    ringColor: 'ring-purple-200',
+    textColor: 'text-purple-400',
+    ringColor: 'ring-purple-700/50',
     questionIds: [8, 9, 10, 11, 12, 13, 14],
   },
   {
     key: 'temporary_payment',
     label: '가지급금 정리 프로젝트 설계',
-    icon: '💰',
     color: 'green',
-    bgGradient: 'from-emerald-500 to-emerald-700',
-    lightBg: 'bg-emerald-50',
+    bgGradient: 'from-emerald-700 to-emerald-900',
+    darkBg: 'bg-emerald-950/30',
     borderColor: 'border-emerald-500',
-    textColor: 'text-emerald-700',
-    ringColor: 'ring-emerald-200',
+    textColor: 'text-emerald-400',
+    ringColor: 'ring-emerald-700/50',
     questionIds: [15, 16, 17, 18, 19, 20, 21],
   },
 ];
 
-// 21문제 요약 데이터 (클라이언트 표시용)
 const QUESTIONS: Record<number, { title: string; submitter: string; issue: string; difficulty: number }> = {
   1: { title: 'Cloud A사 - 가업승계 전략', submitter: '김홍', issue: '가업승계 증여세 과세특례 및 기업가치 관리', difficulty: 3 },
   2: { title: '제조 B사 - 지분 분산 및 경영권 강화', submitter: '권영도', issue: '형제간 지분 분쟁 예방 및 경영권 안정화', difficulty: 3 },
@@ -136,41 +131,44 @@ export default function VotePage() {
 
   if (!evaluator) return null;
 
-  // 투표 완료 화면
   if (submitted) {
     return (
       <div className="max-w-lg mx-auto mt-12">
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden text-center">
-          <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-8 py-10 text-white">
-            <div className="text-6xl mb-4">✅</div>
+        <div className="bg-[#0f1117] rounded-2xl shadow-2xl border border-gray-800 overflow-hidden text-center">
+          <div className="bg-gradient-to-r from-emerald-800 to-green-900 px-8 py-10 text-white">
+            <div className="w-16 h-16 bg-green-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-9 h-9 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
             <h2 className="text-2xl font-bold mb-2">투표 완료</h2>
-            <p className="text-green-100">{evaluator.name}님의 투표가 성공적으로 제출되었습니다.</p>
+            <p className="text-green-200">{evaluator.name}님의 투표가 성공적으로 제출되었습니다.</p>
           </div>
           <div className="px-8 py-6 space-y-3">
             {CATEGORIES.map((cat) => (
-              <div key={cat.key} className={`${cat.lightBg} rounded-lg p-4 text-left`}>
-                <div className="text-xs text-slate-500 mb-1">{cat.icon} {cat.label}</div>
+              <div key={cat.key} className={`${cat.darkBg} border border-gray-700 rounded-lg p-4 text-left`}>
+                <div className="text-xs text-gray-500 mb-1">{cat.label}</div>
                 <div className={`font-bold ${cat.textColor}`}>
                   {selections[cat.key]}번 - {QUESTIONS[selections[cat.key]]?.title}
                 </div>
               </div>
             ))}
           </div>
-          <div className="px-8 py-6 border-t border-slate-100 space-y-3">
+          <div className="px-8 py-6 border-t border-gray-800 space-y-3">
             <button
               onClick={() => router.push('/question-selection/results')}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition"
+              className="w-full bg-blue-700 hover:bg-blue-600 text-white py-3 rounded-lg font-bold transition"
             >
-              📊 투표 현황 보기
+              투표 현황 보기
             </button>
             <button
               onClick={() => {
                 setSubmitted(false);
                 setSelections({});
               }}
-              className="w-full bg-slate-100 text-slate-600 py-3 rounded-lg font-medium hover:bg-slate-200 transition"
+              className="w-full bg-gray-800 text-gray-400 py-3 rounded-lg font-medium hover:bg-gray-700 transition"
             >
-              🔄 다시 투표하기
+              다시 투표하기
             </button>
           </div>
         </div>
@@ -181,16 +179,16 @@ export default function VotePage() {
   return (
     <div className="max-w-5xl mx-auto">
       {/* 상단 정보 */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 px-6 py-4 mb-6 flex items-center justify-between">
+      <div className="bg-[#0f1117] rounded-xl border border-gray-800 px-6 py-4 mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-            <span className="text-blue-600 font-bold text-lg">
+          <div className="w-10 h-10 bg-blue-900/50 rounded-full flex items-center justify-center border border-blue-700/50">
+            <span className="text-blue-400 font-bold text-lg">
               {evaluator.name.charAt(0)}
             </span>
           </div>
           <div>
-            <div className="font-bold text-slate-900">{evaluator.name}</div>
-            <div className="text-xs text-slate-500">{evaluator.role}</div>
+            <div className="font-bold text-white">{evaluator.name}</div>
+            <div className="text-xs text-gray-500">{evaluator.role}</div>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -198,15 +196,15 @@ export default function VotePage() {
             href="https://drive.google.com/file/d/1e3xqEpIarKz3KuGKLm5yTwQt3nmybhpM/view?usp=sharing"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-blue-600 hover:text-blue-700 underline flex items-center gap-1"
+            className="text-sm text-blue-400 hover:text-blue-300 underline flex items-center gap-1"
           >
-            📄 문제은행 PDF
+            문제은행 PDF
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </a>
-          <div className="text-sm">
-            선택: <span className="font-bold text-blue-600">{Object.values(selections).filter(v => v > 0).length}</span>/3
+          <div className="text-sm text-gray-400">
+            선택: <span className="font-bold text-blue-400">{Object.values(selections).filter(v => v > 0).length}</span>/3
           </div>
         </div>
       </div>
@@ -214,27 +212,24 @@ export default function VotePage() {
       {/* 3개 분야 투표 */}
       <div className="space-y-8">
         {CATEGORIES.map((cat) => (
-          <div key={cat.key} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div key={cat.key} className="bg-[#0f1117] rounded-xl border border-gray-800 overflow-hidden">
             {/* 분야 헤더 */}
             <div className={`bg-gradient-to-r ${cat.bgGradient} px-6 py-4 text-white`}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{cat.icon}</span>
-                  <div>
-                    <h3 className="font-bold text-lg">{cat.label}</h3>
-                    <p className="text-sm opacity-80">7문제 중 1문제를 선택하세요</p>
-                  </div>
+                <div>
+                  <h3 className="font-bold text-lg">{cat.label}</h3>
+                  <p className="text-sm opacity-80">7문제 중 1문제를 선택하세요</p>
                 </div>
                 {selections[cat.key] > 0 && (
-                  <div className="bg-white/20 backdrop-blur rounded-lg px-3 py-1.5 text-sm font-medium">
-                    ✓ {selections[cat.key]}번 선택됨
+                  <div className="bg-white/15 backdrop-blur rounded-lg px-3 py-1.5 text-sm font-medium">
+                    {selections[cat.key]}번 선택됨
                   </div>
                 )}
               </div>
             </div>
 
             {/* 문제 목록 */}
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-gray-800">
               {cat.questionIds.map((qId) => {
                 const q = QUESTIONS[qId];
                 const isSelected = selections[cat.key] === qId;
@@ -244,7 +239,9 @@ export default function VotePage() {
                   <div
                     key={qId}
                     className={`transition-all ${
-                      isSelected ? `${cat.lightBg} border-l-4 ${cat.borderColor}` : 'border-l-4 border-transparent hover:bg-slate-50'
+                      isSelected
+                        ? `${cat.darkBg} border-l-4 ${cat.borderColor}`
+                        : 'border-l-4 border-transparent hover:bg-gray-800/30'
                     }`}
                   >
                     <div className="px-6 py-4 flex items-start gap-4">
@@ -253,8 +250,8 @@ export default function VotePage() {
                         onClick={() => handleSelect(cat.key, qId)}
                         className={`mt-1 w-8 h-8 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                           isSelected
-                            ? `${cat.borderColor} ${cat.lightBg} ${cat.textColor}`
-                            : 'border-slate-300 hover:border-slate-400'
+                            ? `${cat.borderColor} ${cat.darkBg} ${cat.textColor}`
+                            : 'border-gray-600 hover:border-gray-500'
                         }`}
                       >
                         {isSelected ? (
@@ -266,7 +263,7 @@ export default function VotePage() {
                             />
                           </svg>
                         ) : (
-                          <span className="text-xs text-slate-400 font-bold">{qId}</span>
+                          <span className="text-xs text-gray-600 font-bold">{qId}</span>
                         )}
                       </button>
 
@@ -274,43 +271,43 @@ export default function VotePage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                            isSelected ? `${cat.lightBg} ${cat.textColor}` : 'bg-slate-100 text-slate-500'
+                            isSelected ? `${cat.darkBg} ${cat.textColor}` : 'bg-gray-800 text-gray-500'
                           }`}>
                             {qId}번
                           </span>
-                          <span className="text-xs text-slate-400">출제: {q.submitter}</span>
+                          <span className="text-xs text-gray-600">출제: {q.submitter}</span>
                           <div className="flex gap-0.5">
                             {Array.from({ length: 5 }, (_, i) => (
-                              <span key={i} className={`text-xs ${i < q.difficulty ? 'text-amber-400' : 'text-slate-200'}`}>
+                              <span key={i} className={`text-xs ${i < q.difficulty ? 'text-amber-400' : 'text-gray-700'}`}>
                                 ★
                               </span>
                             ))}
                           </div>
                         </div>
-                        <h4 className={`font-bold text-sm mb-1 ${isSelected ? cat.textColor : 'text-slate-900'}`}>
+                        <h4 className={`font-bold text-sm mb-1 ${isSelected ? cat.textColor : 'text-gray-200'}`}>
                           {q.title}
                         </h4>
-                        <p className="text-xs text-slate-500 mb-2">{q.issue}</p>
+                        <p className="text-xs text-gray-500 mb-2">{q.issue}</p>
 
                         {/* 상세 보기 토글 */}
                         <button
                           onClick={() => setExpandedQuestion(isExpanded ? null : qId)}
-                          className="text-xs text-blue-500 hover:text-blue-600 flex items-center gap-1"
+                          className="text-xs text-blue-500 hover:text-blue-400 flex items-center gap-1"
                         >
                           {isExpanded ? '접기 ▲' : '상세보기 ▼'}
                         </button>
 
                         {/* 확장 내용 */}
                         {isExpanded && (
-                          <div className="mt-3 bg-slate-50 rounded-lg p-4 text-xs text-slate-600 space-y-2">
-                            <p className="font-medium text-slate-700">
-                              📎 문제은행 PDF에서 상세 내용을 확인하세요
+                          <div className="mt-3 bg-gray-800/60 rounded-lg p-4 text-xs text-gray-400 space-y-2 border border-gray-700">
+                            <p className="font-medium text-gray-300">
+                              문제은행 PDF에서 상세 내용을 확인하세요
                             </p>
                             <a
                               href="https://drive.google.com/file/d/1e3xqEpIarKz3KuGKLm5yTwQt3nmybhpM/view?usp=sharing"
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-blue-600 underline"
+                              className="inline-flex items-center gap-1 text-blue-400 underline"
                             >
                               문제은행 PDF 보기 →
                             </a>
@@ -324,10 +321,10 @@ export default function VotePage() {
                         className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
                           isSelected
                             ? `bg-gradient-to-r ${cat.bgGradient} text-white shadow-md`
-                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                            : 'bg-gray-800 text-gray-500 hover:bg-gray-700'
                         }`}
                       >
-                        {isSelected ? '✓ 선택됨' : '선택'}
+                        {isSelected ? '선택됨' : '선택'}
                       </button>
                     </div>
                   </div>
@@ -339,22 +336,22 @@ export default function VotePage() {
       </div>
 
       {/* 하단 제출 바 */}
-      <div className="sticky bottom-0 mt-8 bg-white/95 backdrop-blur border border-slate-200 rounded-xl shadow-lg px-6 py-4">
+      <div className="sticky bottom-0 mt-8 bg-[#0f1117]/95 backdrop-blur border border-gray-700 rounded-xl shadow-2xl px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-bold text-slate-900">
+            <div className="text-sm font-bold text-white">
               {evaluator.name}님의 투표
             </div>
-            <div className="text-xs text-slate-500 mt-1">
+            <div className="text-xs text-gray-500 mt-1">
               {CATEGORIES.map((cat) => (
                 <span key={cat.key} className="mr-3">
-                  {cat.icon}{' '}
+                  {cat.label.split(' ')[0]}{' '}
                   {selections[cat.key] > 0 ? (
                     <span className={cat.textColor}>
                       {selections[cat.key]}번
                     </span>
                   ) : (
-                    <span className="text-slate-300">미선택</span>
+                    <span className="text-gray-700">미선택</span>
                   )}
                 </span>
               ))}
@@ -365,11 +362,11 @@ export default function VotePage() {
             disabled={!allSelected || submitting}
             className={`px-8 py-3 rounded-lg font-bold text-sm transition-all ${
               allSelected
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg hover:shadow-xl'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                ? 'bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-indigo-700'
+                : 'bg-gray-800 text-gray-600 cursor-not-allowed'
             }`}
           >
-            {submitting ? '제출 중...' : allSelected ? '🗳️ 투표 제출' : `${3 - Object.values(selections).filter(v => v > 0).length}개 분야 선택 필요`}
+            {submitting ? '제출 중...' : allSelected ? '투표 제출' : `${3 - Object.values(selections).filter(v => v > 0).length}개 분야 선택 필요`}
           </button>
         </div>
       </div>

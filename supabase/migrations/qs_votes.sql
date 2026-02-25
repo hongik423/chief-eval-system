@@ -20,4 +20,5 @@ CREATE INDEX IF NOT EXISTS idx_qs_votes_evaluator ON qs_votes(evaluator_id);
 
 -- RLS 활성화 및 익명 접근 허용 (기존 chief_ 테이블과 동일한 정책)
 ALTER TABLE qs_votes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "qs_anon_votes" ON qs_votes;
 CREATE POLICY "qs_anon_votes" ON qs_votes FOR ALL USING (true) WITH CHECK (true);
