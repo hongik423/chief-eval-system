@@ -67,8 +67,21 @@ export async function resetAllVotes() {
 }
 
 // 투표 제출 (재투표 시 덮어쓰기)
+// 정책: 코치 1명당 영역별 3문제 선택 (총 9문제)
 export async function submitVote(evaluatorId, evaluatorName, votes) {
   if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.');
+
+  const requiredFields = ['stock_transfer', 'nominee_stock', 'temporary_payment'];
+  requiredFields.forEach((field) => {
+    const selected = votes[field];
+    if (!Array.isArray(selected) || selected.length !== 3) {
+      throw new Error(`"${field}"는 3문제를 선택해야 합니다.`);
+    }
+    const unique = new Set(selected);
+    if (unique.size !== 3) {
+      throw new Error(`"${field}"는 서로 다른 3문제를 선택해야 합니다.`);
+    }
+  });
 
   const { error } = await supabase
     .from('qs_votes')
@@ -119,6 +132,7 @@ export async function getEvaluatorVote(evaluatorId) {
 }
 
 // 카테고리별 결과 집계
+// 정책: 각 평가위원이 카테고리별 3문제를 선택하므로 배열을 순회해 집계
 export async function getResults() {
   if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.');
 
@@ -138,12 +152,15 @@ export async function getResults() {
     const voteMap = new Map();
 
     votes.forEach((v) => {
-      const qId = v[field];
-      if (!qId) return;
-      const existing = voteMap.get(qId) || { count: 0, voters: [] };
-      existing.count += 1;
-      existing.voters.push(v.evaluator_name);
-      voteMap.set(qId, existing);
+      const picked = Array.isArray(v[field]) ? v[field] : [v[field]].filter(Boolean);
+      // 중복 선택 방어: 한 평가위원이 같은 문제를 여러 번 넣어도 1표만 인정
+      const uniquePicked = Array.from(new Set(picked));
+      uniquePicked.forEach((qId) => {
+        const existing = voteMap.get(qId) || { count: 0, voters: [] };
+        existing.count += 1;
+        existing.voters.push(v.evaluator_name);
+        voteMap.set(qId, existing);
+      });
     });
 
     const allVotes = Array.from(voteMap.entries())

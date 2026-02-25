@@ -92,7 +92,7 @@ export default function LoginPage() {
                 <ol className="text-sm text-slate-200 space-y-1 list-decimal pl-4">
                   <li>로그인</li>
                   <li>상단 네비바 중간 <span className="font-bold">[TEST 문제 선정]</span> 클릭</li>
-                  <li>3개 분야 각 1문제 선택 후 제출</li>
+                  <li>3개 분야 각 3문제(총 9문제) 선택 후 제출</li>
                   <li>대시보드에서 결과 확인</li>
                 </ol>
               </div>

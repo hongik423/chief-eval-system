@@ -188,7 +188,7 @@ export default function QSLoginPage() {
               {[
                 { step: 1, icon: '📄', label: '문제은행 PDF 열기', desc: '치프문제은행 21문제를 미리 검토합니다' },
                 { step: 2, icon: '👤', label: '이름 선택 후 로그인', desc: '본인 이름 클릭 → 비밀번호 입력 (초기: 영어두문자)' },
-                { step: 3, icon: '🗳️', label: '3개 분야 각 1문제 선택', desc: '주식이동 · 차명주식 · 가지급금 분야별 선택' },
+                { step: 3, icon: '🗳️', label: '3개 분야 각 3문제 선택', desc: '주식이동 · 차명주식 · 가지급금 분야별 3문제씩 선택' },
                 { step: 4, icon: '✅', label: '투표 제출', desc: '선택 완료 후 최하단 [투표 제출] 버튼 클릭' },
                 { step: 5, icon: '📊', label: '대시보드에서 결과 확인', desc: '실시간 득표 현황 및 최다득표 문제 확인' },
               ].map(({ step, icon, label, desc }) => (
@@ -476,7 +476,7 @@ export default function QSLoginPage() {
           <div className="text-5xl mb-3">📋</div>
           <h2 className="text-2xl font-bold mb-2 text-stone-900">TEST 케이스 문제 선정</h2>
           <p className="text-stone-800 text-sm font-medium">2026년 ASSO 치프인증 1차 출제</p>
-          <p className="text-stone-700 text-xs mt-1">각 분야별 1문제 선택 → 최다득표 순 3문제 확정</p>
+          <p className="text-stone-700 text-xs mt-1">각 분야별 3문제 선택 → 최다득표 순 최종 3문제 확정</p>
         </div>
 
         {/* 마감 D-day 배너 */}
@@ -527,7 +527,7 @@ export default function QSLoginPage() {
             <div className="text-xs text-amber-300">
               <p className="font-semibold mb-1">투표 안내</p>
               <ul className="space-y-0.5 text-amber-400/80">
-                <li>• 문제은행 21문제 중 분야별 1문제를 선택합니다</li>
+                <li>• 문제은행 21문제 중 분야별 3문제(총 9문제)를 선택합니다</li>
                 <li>• 3개 분야: 주식 이동 / 차명 주식 해소 / 가지급금 정리</li>
                 <li>• 7명 평가위원의 최다득표 순 각 3문제 (총 9문제) 확정</li>
               </ul>

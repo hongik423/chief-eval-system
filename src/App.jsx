@@ -26,6 +26,30 @@ export default function App() {
     }
   }, [currentUser, isAdmin]);
 
+  useEffect(() => {
+    if (!currentUser || isAdmin) return undefined;
+    // 이미 열린 탭에서도 배너를 놓치지 않도록 재노출 보강
+    const showOnFocus = () => setShowTestSelectionBanner(true);
+    const showOnVisible = () => {
+      if (document.visibilityState === 'visible') {
+        setShowTestSelectionBanner(true);
+      }
+    };
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        setShowTestSelectionBanner(true);
+      }
+    }, 60000);
+
+    window.addEventListener('focus', showOnFocus);
+    document.addEventListener('visibilitychange', showOnVisible);
+    return () => {
+      window.removeEventListener('focus', showOnFocus);
+      document.removeEventListener('visibilitychange', showOnVisible);
+      clearInterval(intervalId);
+    };
+  }, [currentUser, isAdmin]);
+
   const testSelectionPhaseBanner = showTestSelectionBanner ? (
     <div className="fixed inset-0 z-[85] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
       <div className="w-full max-w-[620px] rounded-2xl border border-amber-700/40 overflow-hidden shadow-2xl bg-surface-100">
@@ -53,7 +77,7 @@ export default function App() {
             <p className="text-xs text-slate-300 font-semibold mb-2">문제 선정 진행 순서</p>
             <ol className="text-sm text-slate-200 space-y-1 list-decimal pl-4">
               <li>상단 네비바 중간 [TEST 문제 선정] 클릭</li>
-              <li>3개 분야 각 1문제 선택 후 제출</li>
+              <li>3개 분야 각 3문제(총 9문제) 선택 후 제출</li>
               <li>결과 대시보드 확인</li>
             </ol>
           </div>

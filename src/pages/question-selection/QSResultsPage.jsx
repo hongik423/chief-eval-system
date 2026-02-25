@@ -842,7 +842,7 @@ export default function QSResultsPage() {
                       <div>
                         <h3 className="font-bold text-lg">{catResult.categoryLabel}</h3>
                         <p className="text-sm opacity-80">
-                          상위 3문제 선정 (총 {totalVotes}표 / 7명)
+                          상위 3문제 선정 (총 {totalVotes}표 / 최대 21표)
                         </p>
                       </div>
                     </div>
