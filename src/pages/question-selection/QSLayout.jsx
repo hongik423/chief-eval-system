@@ -12,9 +12,11 @@ export default function QSLayout() {
             onClick={() => navigate('/question-selection')}
             className="flex items-center gap-3 hover:opacity-80 transition-opacity"
           >
-            <div className="w-10 h-10 rounded-lg overflow-hidden shadow">
-              <img src="/bi.png" alt="기업의별 로고" className="w-full h-full object-cover" />
-            </div>
+            <img
+              src="/bi.png"
+              alt="기업의별 로고"
+              className="h-10 w-auto max-w-[120px] object-contain rounded-lg shadow"
+            />
             <div className="text-left">
               <h1 className="text-base font-bold text-slate-100 leading-tight">
                 기업의별 치프인증

@@ -1,9 +1,70 @@
 // ================================================================
 // 문제 선정 투표 저장소 - Supabase 연동
 // qs_votes 테이블 사용 (upsert 방식으로 재투표 허용)
+// qs_voting_config (localStorage) - 투표 종료/최종 문제 설정
 // ================================================================
 
 import { supabase } from '@/lib/supabase';
+
+const CONFIG_KEY = 'qs_voting_config';
+
+// 투표 설정 조회 (localStorage)
+export function getVotingConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_KEY);
+    return raw
+      ? JSON.parse(raw)
+      : { closed: false, finalQuestions: null, closedAt: null, scheduledCloseAt: null };
+  } catch {
+    return { closed: false, finalQuestions: null, closedAt: null, scheduledCloseAt: null };
+  }
+}
+
+// 투표 설정 저장 (localStorage)
+export function saveVotingConfig(config) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+}
+
+// 투표 종료 처리
+export function closeVoting(finalQuestions) {
+  saveVotingConfig({ closed: true, finalQuestions, closedAt: new Date().toISOString() });
+}
+
+// 투표 재개
+export function reopenVoting() {
+  saveVotingConfig({ closed: false, finalQuestions: null, closedAt: null });
+}
+
+// 최종 문제 수정 (관리자 전용)
+export function updateFinalQuestions(finalQuestions) {
+  const current = getVotingConfig();
+  saveVotingConfig({ ...current, finalQuestions });
+}
+
+// 예약 종료 설정 (관리자 전용)
+export function setScheduledClose(scheduledAt) {
+  const current = getVotingConfig();
+  saveVotingConfig({ ...current, scheduledCloseAt: scheduledAt });
+}
+
+// 예약 종료 취소 (관리자 전용)
+export function clearScheduledClose() {
+  const current = getVotingConfig();
+  saveVotingConfig({ ...current, scheduledCloseAt: null });
+}
+
+// 투표 설정만 초기화 (closed/schedule/finalQuestions 리셋)
+export function resetVotingConfig() {
+  saveVotingConfig({ closed: false, finalQuestions: null, closedAt: null, scheduledCloseAt: null });
+}
+
+// 투표 전체 초기화 - Supabase 데이터 + 설정 모두 삭제 (관리자 전용)
+export async function resetAllVotes() {
+  if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.');
+  const { error } = await supabase.from('qs_votes').delete().neq('evaluator_id', '');
+  if (error) throw error;
+  resetVotingConfig();
+}
 
 // 투표 제출 (재투표 시 덮어쓰기)
 export async function submitVote(evaluatorId, evaluatorName, votes) {
