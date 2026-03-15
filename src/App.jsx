@@ -19,35 +19,12 @@ export default function App() {
 
   useEffect(() => {
     if (currentUser && !isAdmin) {
-      // 접속 직후(로그인 후) TEST 문제선정 배너를 우선 노출
-      setShowTestSelectionBanner(true);
+      // 세션당 1회만 표시: "닫기" 클릭 시 sessionStorage에 기록
+      const dismissed = sessionStorage.getItem('test_selection_banner_dismissed');
+      setShowTestSelectionBanner(!dismissed);
     } else {
       setShowTestSelectionBanner(false);
     }
-  }, [currentUser, isAdmin]);
-
-  useEffect(() => {
-    if (!currentUser || isAdmin) return undefined;
-    // 이미 열린 탭에서도 배너를 놓치지 않도록 재노출 보강
-    const showOnFocus = () => setShowTestSelectionBanner(true);
-    const showOnVisible = () => {
-      if (document.visibilityState === 'visible') {
-        setShowTestSelectionBanner(true);
-      }
-    };
-    const intervalId = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        setShowTestSelectionBanner(true);
-      }
-    }, 60000);
-
-    window.addEventListener('focus', showOnFocus);
-    document.addEventListener('visibilitychange', showOnVisible);
-    return () => {
-      window.removeEventListener('focus', showOnFocus);
-      document.removeEventListener('visibilitychange', showOnVisible);
-      clearInterval(intervalId);
-    };
   }, [currentUser, isAdmin]);
 
   const testSelectionPhaseBanner = showTestSelectionBanner ? (

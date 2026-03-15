@@ -134,7 +134,12 @@ export default function QSResultsPage() {
   const fetchData = useCallback(async () => {
     try {
       setFetchError('');
-      const [st, rs] = await Promise.all([getVoteStatus(), getResults()]);
+      const timeout = (ms) =>
+        new Promise((_, reject) => setTimeout(() => reject(new Error('데이터 로드 시간 초과')), ms));
+      const [st, rs] = await Promise.race([
+        Promise.all([getVoteStatus(), getResults()]),
+        timeout(15000),
+      ]);
       setStatus(st);
       setResults(rs);
       resultsRef.current = rs; // 최신 results를 ref에 동기화
@@ -567,6 +572,7 @@ export default function QSResultsPage() {
       <div className="max-w-4xl mx-auto mt-16 text-center">
         <div className="text-5xl mb-4 animate-spin inline-block">⏳</div>
         <p className="text-slate-400">투표 결과를 불러오는 중...</p>
+        <p className="text-[10px] text-slate-600 mt-6">빌드: 2026-03-15-roulette</p>
       </div>
     );
   }
