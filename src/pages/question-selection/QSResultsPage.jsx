@@ -112,6 +112,14 @@ export default function QSResultsPage() {
   const [drawSpinning, setDrawSpinning] = useState(null); // 4단계 추첨 중인 candidateId
   const [drawResults, setDrawResults] = useState({}); // { candidateId: { category, questionId } }
 
+  // ── 4단계 룰렛 모달
+  const [showRoulette, setShowRoulette] = useState(false);
+  const [rouletteCandidateId, setRouletteCandidateId] = useState(null);
+  const [rouletteQuestions, setRouletteQuestions] = useState([]); // [{key, questionId, label, color, fill, stroke}]
+  const [roulettePhase, setRoulettePhase] = useState('idle'); // idle | spinning | result
+  const [rouletteResult, setRouletteResult] = useState(null);
+  const [rouletteAngle, setRouletteAngle] = useState(0);
+
   // 최신 results를 interval 내부에서 안전하게 참조하기 위한 ref
   const resultsRef = useRef([]);
 
@@ -391,24 +399,60 @@ export default function QSResultsPage() {
     setAssignSavedAt(null);
   };
 
-  // ── 4단계 최종 1문제 추첨 실행
+  // ── 룰렛 분야 정의
+  const ROULETTE_CATS = [
+    { key: 'stock_transfer',    label: '주식이동', icon: '📊', color: '#93c5fd', fill: '#1e3a5f', stroke: '#3b82f6' },
+    { key: 'nominee_stock',     label: '차명주식', icon: '🔐', color: '#d8b4fe', fill: '#3b1f5f', stroke: '#a855f7' },
+    { key: 'temporary_payment', label: '가지급금', icon: '💰', color: '#6ee7b7', fill: '#1a4035', stroke: '#10b981' },
+  ];
+
+  // ── 4단계 최종 1문제 추첨 실행 (룰렛 모달 오픈)
   const handleFinalDraw = (candidateId) => {
+    // 추첨 결과 미리 계산 (결정론적)
+    let result;
+    try {
+      result = executeFinalDraw(candidateId, adminName || '평가위원회');
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+
+    // 해당 후보자 배정 문제 조합
+    const cs = trackerSummary.find((c) => c.candidateId === candidateId);
+    const questions = ROULETTE_CATS.map((cat) => ({
+      ...cat,
+      questionId: cs?.record?.stage2?.[cat.key] ?? '?',
+    }));
+
+    // 당첨 섹터 인덱스 → 최종 회전 각도 계산
+    const winIdx = ROULETTE_CATS.findIndex((c) => c.key === result.category);
+    // 섹터 i 의 중심은 top 기준 (i*120 + 60)° 위치
+    // 포인터(top)로 가져오려면: 360 - sectorCenter (+ 6 full spins)
+    const sectorCenter = winIdx * 120 + 60;
+    const finalAngle = 6 * 360 + (360 - sectorCenter);
+
+    // 상태 세팅
+    setRouletteCandidateId(candidateId);
+    setRouletteQuestions(questions);
+    setRouletteResult(result);
+    setRouletteAngle(0);       // 애니메이션 시작 전 0으로 초기화
+    setRoulettePhase('idle');
+    setShowRoulette(true);
     setDrawSpinning(candidateId);
-    // 슬롯머신 스타일 애니메이션 (1.5초 후 결과)
+
+    // 짧은 지연 후 스핀 시작 (0 → finalAngle CSS transition 트리거)
     setTimeout(() => {
-      try {
-        const result = executeFinalDraw(candidateId, adminName || '평가위원회');
-        setDrawResults((prev) => ({
-          ...prev,
-          [candidateId]: result,
-        }));
-        setTrackerSummary(getCandidateTrackerSummary());
-      } catch (err) {
-        alert(err.message);
-      } finally {
-        setDrawSpinning(null);
-      }
-    }, 1500);
+      setRoulettePhase('spinning');
+      setRouletteAngle(finalAngle);
+    }, 150);
+
+    // 4.5초 후 결과 표시
+    setTimeout(() => {
+      setRoulettePhase('result');
+      setDrawResults((prev) => ({ ...prev, [candidateId]: result }));
+      setTrackerSummary(getCandidateTrackerSummary());
+      setDrawSpinning(null);
+    }, 4700);
   };
 
   // ── 추적 데이터 리프레시
@@ -482,6 +526,237 @@ export default function QSResultsPage() {
 
   return (
     <div className="max-w-5xl mx-auto">
+
+      {/* ═══════════════════════════════════════════════════════════════
+          4단계 최종 문제 선정 룰렛 모달
+      ════════════════════════════════════════════════════════════════ */}
+      {showRoulette && (() => {
+        const cs = trackerSummary.find((c) => c.candidateId === rouletteCandidateId);
+        const toSvgXY = (degFromTop, r, cx = 130, cy = 130) => ({
+          x: cx + r * Math.sin((degFromTop * Math.PI) / 180),
+          y: cy - r * Math.cos((degFromTop * Math.PI) / 180),
+        });
+        const makeSectorPath = (startDeg, endDeg, r = 120, cx = 130, cy = 130) => {
+          const s = toSvgXY(startDeg, r, cx, cy);
+          const e = toSvgXY(endDeg, r, cx, cy);
+          return `M ${cx} ${cy} L ${s.x} ${s.y} A ${r} ${r} 0 0 1 ${e.x} ${e.y} Z`;
+        };
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center px-4"
+            style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(12px)' }}
+          >
+            <div
+              className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl"
+              style={{
+                background: 'linear-gradient(180deg, #0f172a 0%, #1a0505 50%, #0f0a1e 100%)',
+                border: '2px solid #ef4444',
+                boxShadow: '0 0 60px rgba(239,68,68,0.3)',
+              }}
+            >
+              {/* 헤더 */}
+              <div
+                className="px-6 py-4 text-center"
+                style={{ background: 'linear-gradient(135deg, #7f1d1d 0%, #991b1b 50%, #7f1d1d 100%)' }}
+              >
+                <p className="text-3xl mb-1">🎰</p>
+                <h2 className="text-xl font-black text-white">최종 문제 추첨</h2>
+                <p className="text-xs text-red-300 mt-0.5">4단계 · 평가당일 랜덤 1문제 선정</p>
+              </div>
+
+              {/* 피평가자 정보 */}
+              <div className="px-6 pt-4 pb-2 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-3"
+                  style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid #ef444450' }}>
+                  <span className="text-lg font-black text-red-400">{cs?.name?.charAt(0)}</span>
+                  <span className="font-bold text-slate-200">{cs?.name}</span>
+                  <span className="text-xs text-slate-500">{cs?.team}</span>
+                </div>
+                {/* 배정된 3문제 미니 표시 */}
+                <div className="flex items-center justify-center gap-2">
+                  {rouletteQuestions.map((q, i) => (
+                    <div
+                      key={q.key}
+                      className="rounded-xl px-3 py-2 text-center transition-all duration-500"
+                      style={{
+                        background: roulettePhase === 'result' && rouletteResult?.category === q.key
+                          ? `${q.stroke}30` : 'rgba(15,23,42,0.8)',
+                        border: `2px solid ${roulettePhase === 'result' && rouletteResult?.category === q.key
+                          ? q.stroke : '#1e293b'}`,
+                        transform: roulettePhase === 'result' && rouletteResult?.category === q.key
+                          ? 'scale(1.15)' : 'scale(1)',
+                        boxShadow: roulettePhase === 'result' && rouletteResult?.category === q.key
+                          ? `0 0 20px ${q.stroke}60` : 'none',
+                        opacity: roulettePhase === 'result' && rouletteResult?.category !== q.key ? 0.35 : 1,
+                      }}
+                    >
+                      <p className="text-lg font-black leading-none" style={{ color: q.color }}>#{q.questionId}</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: q.color }}>{q.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 룰렛 휠 영역 */}
+              <div className="flex items-center justify-center py-4">
+                <div className="relative" style={{ width: 280, height: 280 }}>
+                  {/* 포인터 삼각형 (상단 중앙) */}
+                  <div
+                    className="absolute z-20"
+                    style={{
+                      top: -2, left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 0, height: 0,
+                      borderLeft: '14px solid transparent',
+                      borderRight: '14px solid transparent',
+                      borderTop: '26px solid #ef4444',
+                      filter: 'drop-shadow(0 0 8px rgba(239,68,68,1))',
+                    }}
+                  />
+                  {/* 외곽 링 */}
+                  <div
+                    className="absolute inset-0 rounded-full z-10 pointer-events-none"
+                    style={{
+                      border: '5px solid #ef4444',
+                      boxShadow: '0 0 24px rgba(239,68,68,0.5), inset 0 0 12px rgba(0,0,0,0.5)',
+                    }}
+                  />
+                  {/* SVG 회전 휠 */}
+                  <svg
+                    width="280" height="280" viewBox="0 0 260 260"
+                    style={{
+                      position: 'absolute', inset: 0,
+                      transform: `rotate(${rouletteAngle}deg)`,
+                      transition: roulettePhase === 'spinning'
+                        ? 'transform 4.5s cubic-bezier(0.08, 0.6, 0.1, 1)' : 'none',
+                    }}
+                  >
+                    {rouletteQuestions.map((q, i) => {
+                      const startDeg = i * 120;
+                      const endDeg = (i + 1) * 120;
+                      const midDeg = startDeg + 60;
+                      const textPos = toSvgXY(midDeg, 72, 130, 130);
+                      const iconPos = toSvgXY(midDeg, 94, 130, 130);
+                      return (
+                        <g key={q.key}>
+                          {/* 섹터 */}
+                          <path
+                            d={makeSectorPath(startDeg, endDeg)}
+                            fill={q.fill}
+                            stroke="#0f172a"
+                            strokeWidth="2.5"
+                          />
+                          {/* 섹터 테두리 (색상) */}
+                          <path
+                            d={makeSectorPath(startDeg, endDeg, 120)}
+                            fill="none"
+                            stroke={q.stroke}
+                            strokeWidth="2"
+                            opacity="0.6"
+                          />
+                          {/* 아이콘 */}
+                          <text
+                            x={iconPos.x} y={iconPos.y}
+                            textAnchor="middle" dominantBaseline="middle"
+                            fontSize="18"
+                          >{q.icon}</text>
+                          {/* 문제 번호 */}
+                          <text
+                            x={textPos.x} y={textPos.y - 8}
+                            textAnchor="middle" dominantBaseline="middle"
+                            fill={q.color} fontSize="22" fontWeight="900"
+                            fontFamily="monospace"
+                          >#{q.questionId}</text>
+                          {/* 분야명 */}
+                          <text
+                            x={textPos.x} y={textPos.y + 14}
+                            textAnchor="middle" dominantBaseline="middle"
+                            fill={q.color} fontSize="10" fontWeight="700"
+                          >{q.label}</text>
+                          {/* 섹터 구분선 */}
+                          {(() => {
+                            const lineEnd = toSvgXY(endDeg, 120, 130, 130);
+                            return (
+                              <line
+                                x1="130" y1="130"
+                                x2={lineEnd.x} y2={lineEnd.y}
+                                stroke="#0f172a" strokeWidth="3"
+                              />
+                            );
+                          })()}
+                        </g>
+                      );
+                    })}
+                    {/* 중앙 허브 */}
+                    <circle cx="130" cy="130" r="22" fill="#0f172a" stroke="#ef4444" strokeWidth="3" />
+                    <circle cx="130" cy="130" r="16" fill="#1a0505" stroke="#991b1b" strokeWidth="1.5" />
+                    <text x="130" y="130" textAnchor="middle" dominantBaseline="middle" fontSize="16">🎯</text>
+                  </svg>
+                </div>
+              </div>
+
+              {/* 스피닝 중 메시지 */}
+              {(roulettePhase === 'spinning' || roulettePhase === 'idle') && (
+                <div className="px-6 pb-5 text-center">
+                  <p className="text-red-400 font-bold animate-pulse">
+                    {roulettePhase === 'spinning' ? '🎰 추첨 중...' : '잠시 후 시작됩니다...'}
+                  </p>
+                  <div className="flex items-center justify-center gap-1 mt-2">
+                    {[0, 1, 2].map((i) => (
+                      <div
+                        key={i}
+                        className="w-2 h-2 rounded-full animate-bounce"
+                        style={{ background: '#ef4444', animationDelay: `${i * 0.2}s` }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 결과 표시 */}
+              {roulettePhase === 'result' && rouletteResult && (() => {
+                const winCat = ROULETTE_CATS.find((c) => c.key === rouletteResult.category);
+                const winQ = rouletteQuestions.find((q) => q.key === rouletteResult.category);
+                return (
+                  <div className="px-6 pb-6">
+                    {/* 당첨 결과 박스 */}
+                    <div
+                      className="rounded-2xl px-6 py-5 mb-4 text-center"
+                      style={{
+                        background: `linear-gradient(135deg, ${winCat?.fill || '#1a0505'} 0%, rgba(239,68,68,0.1) 100%)`,
+                        border: `2px solid ${winCat?.stroke || '#ef4444'}`,
+                        boxShadow: `0 0 30px ${winCat?.stroke || '#ef4444'}40`,
+                      }}
+                    >
+                      <p className="text-xs font-bold mb-2" style={{ color: winCat?.color }}>
+                        🎯 최종 선정 문제
+                      </p>
+                      <p className="text-5xl font-black mb-1" style={{ color: winCat?.stroke }}>
+                        #{rouletteResult.questionId}
+                      </p>
+                      <p className="text-sm font-bold" style={{ color: winCat?.color }}>
+                        {winCat?.icon} {getCategoryLabel(rouletteResult.category)}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-2">
+                        {cs?.name} · {new Date().toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 추첨
+                      </p>
+                    </div>
+                    {/* 닫기 버튼 */}
+                    <button
+                      onClick={() => { setShowRoulette(false); setRoulettePhase('idle'); }}
+                      className="w-full py-3.5 rounded-2xl text-base font-black text-white transition hover:opacity-90 active:scale-95 shadow-lg"
+                      style={{ background: 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)' }}
+                    >
+                      ✅ 확인 · 닫기
+                    </button>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ═══ 예약 종료 공개 카운트다운 배너 (관리자 아닌 사람도 확인 가능) ═══ */}
       {!votingConfig.closed && votingConfig.scheduledCloseAt && (
@@ -1224,8 +1499,8 @@ export default function QSResultsPage() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-stone-700 font-medium">시험일</p>
-                <p className="text-sm font-black text-stone-900">{EXAM_DATE_STR}</p>
+                <p className="text-xs text-stone-700 font-medium">배정일</p>
+                <p className="text-sm font-black text-stone-900">{ROUND2_DATE_STR}</p>
               </div>
             </div>
 

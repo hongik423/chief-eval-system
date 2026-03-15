@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { ADMIN_ID } from '@/lib/constants';
+import { SCHEDULE_MILESTONES } from '@/lib/qsAssignmentStore';
 import { Card, Button, ConnectionStatus } from '@/components/ui';
 import ManualModal from '@/components/ManualModal';
 import AnnouncementModal from '@/components/AnnouncementModal';
@@ -77,14 +78,48 @@ export default function LoginPage() {
             </div>
 
             <div className="p-5 sm:p-6 space-y-3">
-              <div className="rounded-xl border border-red-700/40 bg-red-950/40 px-4 py-3">
-                <p className="text-xs text-red-300 font-semibold">⏰ 투표 마감 시간</p>
-                <p className="text-base sm:text-lg font-bold text-red-200 mt-1">내일 (2월 26일 목요일) 오전 12시까지</p>
+              <div className="rounded-xl border border-amber-700/40 bg-amber-950/30 px-4 py-3">
+                <p className="text-xs text-amber-300 font-semibold">🎲 2차 출제</p>
+                <p className="text-sm text-amber-200/90 mt-1">
+                  3월 18일(수) <span className="text-amber-400/80">(평가일 10일 전)</span>
+                </p>
+                <ul className="text-sm text-slate-200 space-y-0.5 mt-2 list-disc list-inside">
+                  <li>최종 3문제 선정 및 배정</li>
+                  <li>1차 출제 9문제 중 각 분야별 1문제씩 선정</li>
+                  <li>총 3문제를 평가 대상자에게 배정</li>
+                  <li>멘토링 기간 시작 (3/18~3/27, 선택사항)</li>
+                </ul>
               </div>
 
-              <div className="rounded-xl border border-blue-700/40 bg-blue-950/30 px-4 py-3">
-                <p className="text-xs text-blue-300 font-semibold">📣 오후 일정 안내</p>
-                <p className="text-sm text-blue-200/90 mt-1">투표 종료 후 오후에 인증후보자에게 확정 문제 출제를 고지합니다.</p>
+              <div className="rounded-xl border border-emerald-700/40 bg-emerald-950/30 px-4 py-3">
+                <p className="text-xs text-emerald-300 font-semibold mb-3">📅 앞으로의 일정</p>
+                <div className="max-h-[320px] overflow-y-auto space-y-4 pr-1">
+                  {[
+                    ...SCHEDULE_MILESTONES.filter((m) => m.step === '2-2'),
+                    { step: '3', title: '멘토링 기간', date: '3월 18일 ~ 27일', dateNote: null, icon: '📚', items: ['선택사항 · 코치 자격 보유 평가위원에게 멘토링 요청 가능'] },
+                    ...SCHEDULE_MILESTONES.filter((m) => ['4', '5', '6', '7', '8'].includes(m.step)),
+                  ].map((m) => (
+                    <div key={m.step} className="border-b border-emerald-800/40 pb-3 last:border-0 last:pb-0">
+                      <div className="flex items-start gap-2 mb-1.5">
+                        <span className="text-base flex-shrink-0">{m.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-100">
+                            {m.step}단계 {m.title}
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            {m.date}
+                            {m.dateNote && <span className="text-slate-600"> ({m.dateNote})</span>}
+                          </p>
+                        </div>
+                      </div>
+                      <ul className="text-[11px] text-slate-400 space-y-0.5 ml-6 list-disc list-inside">
+                        {(m.items || []).map((item, i) => (
+                          <li key={i}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="rounded-xl border border-surface-500/40 bg-surface-200/30 px-4 py-3">
