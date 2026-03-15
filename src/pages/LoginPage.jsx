@@ -119,17 +119,22 @@ export default function LoginPage() {
                       </ul>
                     </div>
                   ))}
-                </div>
-              </div>
 
-              <div className="rounded-xl border border-surface-500/40 bg-surface-200/30 px-4 py-3">
-                <p className="text-xs text-slate-300 font-semibold mb-2">문제 선정 진행 순서</p>
-                <ol className="text-sm text-slate-200 space-y-1 list-decimal pl-4">
-                  <li>로그인</li>
-                  <li>상단 네비바 중간 <span className="font-bold">[TEST 문제 선정]</span> 클릭</li>
-                  <li>3개 분야 각 3문제(총 9문제) 선택 후 제출</li>
-                  <li>대시보드에서 결과 확인</li>
-                </ol>
+                  {/* 8단계 이후: 문제 선정 · 2차 출제 진행 순서 (시계열 단계별) */}
+                  <div className="border-t border-emerald-700/50 pt-3 mt-2">
+                    <p className="text-xs font-bold text-emerald-300 mb-2">📋 문제 선정 진행 순서 (시계열 단계별)</p>
+                    <ol className="text-[11px] text-slate-400 space-y-1 list-decimal pl-4">
+                      <li>로그인</li>
+                      <li>상단 네비바 중간 <span className="font-semibold text-slate-300">[TEST 문제 선정]</span> 클릭</li>
+                      <li><span className="text-slate-300">1차:</span> 3개 분야 각 3문제(총 9문제) 선택 후 제출</li>
+                      <li><span className="text-slate-300">[결과보기]</span>에서 1차 투표 결과 확인 (대시보드)</li>
+                      <li><span className="text-slate-300">1차:</span> (관리자) 투표 종료 후 최종 9문제 확정</li>
+                      <li><span className="text-slate-300">2차:</span> &quot;테스트 시뮬레이션&quot; 클릭 → 랜덤 배정 결과 미리 확인 (선택)</li>
+                      <li><span className="text-slate-300">2차:</span> &quot;확정 배정 실행&quot; 클릭 → 피평가자별 3문제 랜덤 배정 최종 선정</li>
+                      <li>개인 URL 발급 후 인증후보자에게 공유</li>
+                    </ol>
+                  </div>
+                </div>
               </div>
 
               <button
