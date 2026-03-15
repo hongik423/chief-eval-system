@@ -9,8 +9,15 @@ import {
 } from '@/data/qsEvaluators';
 import { QS_PDF_URL } from '@/data/qsQuestions';
 import { getVotingConfig } from '@/lib/qsVoteStore';
-
-const DEADLINE = new Date('2026-02-26T12:00:00');
+import {
+  EXAM_DATE,
+  EXAM_DATE_STR,
+  ROUND2_DATE_STR,
+  MENTORING_START,
+  MENTORING_END,
+  SCHEDULE_MILESTONES,
+  getCurrentStep,
+} from '@/lib/qsAssignmentStore';
 
 export default function QSLoginPage() {
   const navigate = useNavigate();
@@ -21,7 +28,8 @@ export default function QSLoginPage() {
 
   // 공지 모달
   const [showNotice, setShowNotice] = useState(true);
-  const [deadlineText, setDeadlineText] = useState('');
+  const [examCountdown, setExamCountdown] = useState('');
+  const [examDDay, setExamDDay] = useState('');
 
   // 비밀번호 변경 모달
   const [showPwChange, setShowPwChange] = useState(false);
@@ -36,15 +44,16 @@ export default function QSLoginPage() {
 
   useEffect(() => {
     const tick = () => {
-      const diff = DEADLINE - new Date();
-      if (diff <= 0) { setDeadlineText('마감됨'); return; }
-      const h = Math.floor(diff / 3600000);
+      const diff = EXAM_DATE - new Date();
+      if (diff <= 0) { setExamCountdown('시험 당일'); setExamDDay('D-0'); return; }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      setDeadlineText(`${h}시간 ${String(m).padStart(2, '0')}분 ${String(s).padStart(2, '0')}초`);
+      setExamDDay(`D-${d}`);
+      setExamCountdown(`${d}일 ${h}시간 ${m}분 남음`);
     };
     tick();
-    const id = setInterval(tick, 1000);
+    const id = setInterval(tick, 30000);
     return () => clearInterval(id);
   }, []);
 
@@ -121,7 +130,11 @@ export default function QSLoginPage() {
     {/* ════════════════════════════════════════
         공지 모달
     ════════════════════════════════════════ */}
-    {showNotice && (
+    {showNotice && (() => {
+      const now = new Date();
+      const isMentoring = now >= MENTORING_START && now <= MENTORING_END;
+      const currentStep = getCurrentStep();
+      return (
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 overflow-y-auto"
         style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}>
         <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border border-stone-600/40 my-auto"
@@ -130,100 +143,132 @@ export default function QSLoginPage() {
           {/* 헤더 */}
           <div className="px-6 py-5 text-center border-b border-stone-600/40"
             style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}>
-            <div className="text-4xl mb-2">📢</div>
-            <h2 className="text-xl font-bold text-stone-900">TEST 케이스 문제 선정 공지</h2>
-            <p className="text-stone-700 text-xs mt-1 font-medium">2026 ASSO 치프인증 1차 출제</p>
+            <div className="text-4xl mb-2">🏆</div>
+            <h2 className="text-xl font-bold text-stone-900">2026 ASSO 치프인증 평가</h2>
+            <p className="text-stone-700 text-xs mt-1 font-medium">TEST RED · 인증 평가 진행 안내</p>
           </div>
 
-          {/* 마감 카운트다운 */}
-          <div className="mx-6 mt-5 rounded-xl border border-red-700/60 overflow-hidden"
-            style={{ background: 'linear-gradient(135deg, #1c0606 0%, #2d0a0a 100%)' }}>
+          {/* 시험일 카운트다운 */}
+          <div className="mx-6 mt-5 rounded-xl border overflow-hidden"
+            style={{ borderColor: 'rgb(163,120,55)', background: 'linear-gradient(135deg, #1a1207 0%, #292010 100%)' }}>
             <div className="px-5 py-4 flex items-center gap-4">
-              <span className="text-3xl">⏰</span>
+              <span className="text-3xl">📋</span>
               <div className="flex-1">
-                <p className="text-xs text-red-400 font-bold mb-0.5">투표 마감 시간</p>
-                <p className="text-base font-extrabold text-red-200">
-                  내일 (2월 26일 목요일) 오전 12시까지
-                </p>
+                <p className="text-xs font-bold mb-0.5" style={{ color: 'rgb(214,173,101)' }}>인증평가 시험일</p>
+                <p className="text-base font-extrabold text-slate-100">{EXAM_DATE_STR}</p>
+                <p className="text-xs text-slate-500 mt-0.5">오전 10:00 시작 · 인터뷰 + PT 발제안</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-red-500 mb-0.5">남은 시간</p>
-                <p className="text-lg font-bold text-red-300 tabular-nums leading-none">{deadlineText}</p>
+                <p className="text-3xl font-black tabular-nums leading-none" style={{ color: 'rgb(214,173,101)' }}>{examDDay}</p>
+                <p className="text-[10px] text-slate-500 mt-1">{examCountdown}</p>
               </div>
             </div>
           </div>
 
-          {/* 오후 공지 안내 */}
-          <div className="mx-6 mt-3 rounded-xl border border-blue-700/50 px-5 py-3.5 flex items-start gap-3"
-            style={{ background: 'rgba(30,58,138,0.25)' }}>
-            <span className="text-xl mt-0.5">📣</span>
-            <div>
-              <p className="text-xs font-bold text-blue-300 mb-0.5">오후 일정 안내</p>
-              <p className="text-xs text-blue-400/90 leading-relaxed">
-                투표 종료 후 오늘 오후에 <span className="text-blue-200 font-bold">인증후보자에게 확정 문제 출제를 고지</span>합니다.
-                마감 전까지 반드시 투표를 완료해 주세요.
-              </p>
+          {/* 1차 출제 완료 알림 */}
+          <div className="mx-6 mt-3 rounded-xl border border-emerald-700/50 px-5 py-3 flex items-center gap-3"
+            style={{ background: 'rgba(5,46,22,0.5)' }}>
+            <span className="text-lg">✅</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-emerald-400">1차 출제 완료 · 9문제 확정</p>
+              <p className="text-[11px] text-emerald-600">2026년 2월 26일 마감 · 분야별 3문제씩 최다득표 확정</p>
             </div>
           </div>
 
-          {/* 비밀번호 안내 */}
-          <div className="mx-6 mt-3 rounded-xl border border-stone-600/50 px-5 py-3.5 flex items-start gap-3"
-            style={{ background: 'rgba(120,80,20,0.2)' }}>
-            <span className="text-xl mt-0.5">🔑</span>
-            <div>
-              <p className="text-xs font-bold mb-0.5" style={{ color: 'rgb(214,173,101)' }}>초기 비밀번호 안내</p>
-              <p className="text-xs text-stone-400/90 leading-relaxed">
-                초기 비밀번호는 <span className="font-bold text-stone-200">이름 영어 두문자</span>입니다.
-                (예: 나동환 → <span className="font-mono bg-slate-700 px-1 rounded text-stone-200">ndh</span>)
-                로그인 후 <span className="font-bold text-stone-200">비밀번호 변경</span>을 권장합니다.
-              </p>
+          {/* 멘토링 기간 안내 (활성 시) */}
+          {isMentoring && (
+            <div className="mx-6 mt-3 rounded-xl border border-emerald-600/50 px-5 py-3 flex items-center gap-3"
+              style={{ background: 'rgba(5,46,22,0.4)' }}>
+              <span className="text-lg">📚</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-emerald-400">멘토링 기간 진행중</p>
+                <p className="text-[11px] text-emerald-600">3월 18일(수) ~ 3월 27일(금) · 코치 자격 보유 평가위원에게 멘토링 요청 가능</p>
+              </div>
+              <span className="text-xs px-2 py-1 rounded-full font-bold animate-pulse"
+                style={{ background: '#16653430', color: '#4ade80', border: '1px solid #16653460' }}>
+                NOW
+              </span>
             </div>
-          </div>
+          )}
 
-          {/* 단계별 가이드 */}
+          {/* 치프인증 진행 일정 타임라인 */}
           <div className="px-6 mt-5">
             <p className="text-xs font-bold text-slate-400 mb-3 flex items-center gap-1.5">
-              <span className="text-slate-500">●</span> 문제 선정 진행 순서
+              🗺️ 치프인증 진행 일정
             </p>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {[
-                { step: 1, icon: '📄', label: '문제은행 PDF 열기', desc: '치프문제은행 21문제를 미리 검토합니다' },
-                { step: 2, icon: '👤', label: '이름 선택 후 로그인', desc: '본인 이름 클릭 → 비밀번호 입력 (초기: 영어두문자)' },
-                { step: 3, icon: '🗳️', label: '3개 분야 각 3문제 선택', desc: '주식이동 · 차명주식 · 가지급금 분야별 3문제씩 선택' },
-                { step: 4, icon: '✅', label: '투표 제출', desc: '선택 완료 후 최하단 [투표 제출] 버튼 클릭' },
-                { step: 5, icon: '📊', label: '대시보드에서 결과 확인', desc: '실시간 득표 현황 및 최다득표 문제 확인' },
-              ].map(({ step, icon, label, desc }) => (
-                <div key={step} className="flex items-start gap-3 rounded-lg px-4 py-2.5 border border-slate-700/60"
-                  style={{ background: 'rgba(30,41,59,0.6)' }}>
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                    style={{ background: 'rgb(214,173,101)', border: '1.5px solid rgb(163,120,55)' }}>
-                    <span className="text-xs font-black text-stone-900">{step}</span>
+                { step: '1', icon: '🗳️', label: '1차 출제 (문제 선정)', date: '2월 26일 마감', status: 'done', color: '#10b981' },
+                { step: '2-2', icon: '🎲', label: '2차 출제 (3문제 랜덤 배정)', date: ROUND2_DATE_STR?.replace('2026년 ', '') || '3월 18일(수)', status: currentStep === '2-2' ? 'current' : (currentStep && SCHEDULE_MILESTONES.findIndex(m => m.step === currentStep) > 0 ? 'done' : 'future'), color: '#d97706' },
+                { step: '3', icon: '📚', label: '멘토링 기간 (선택사항)', date: '3월 18일 ~ 27일', status: isMentoring ? 'current' : (now > MENTORING_END ? 'done' : 'future'), color: '#6366f1' },
+                { step: '4', icon: '🎰', label: '최종 1문제 추첨 (평가위원회)', date: '3월 28일(토) 오전', status: currentStep === '4' || currentStep === '5' || currentStep === '6' ? 'done' : 'future', color: '#ef4444' },
+                { step: '5', icon: '📋', label: '인증평가 실시', date: EXAM_DATE_STR || '3월 28일(토)', status: currentStep === '5' || currentStep === '6' ? 'current' : 'future', color: '#3b82f6' },
+                { step: '6', icon: '🤝', label: '평가위원 협의 · 합격/불합격 결정', date: '3월 28일(토)', status: currentStep === '6' ? 'current' : 'future', color: '#8b5cf6' },
+                { step: '7', icon: '📢', label: '최종 결과 발표 (점수 비공개)', date: '3월 31일(화)', status: currentStep === '7' ? 'current' : (currentStep === '8' ? 'done' : 'future'), color: '#10b981' },
+                { step: '8', icon: '🏆', label: '인증서 수여식', date: '4월 TAG일', status: currentStep === '8' ? 'current' : 'future', color: '#f59e0b' },
+              ].map(({ step, icon, label, date, status, color }) => (
+                <div key={step}
+                  className="flex items-center gap-3 rounded-lg px-4 py-2.5 border transition-all"
+                  style={{
+                    borderColor: status === 'current' ? `${color}60` : status === 'done' ? '#16534050' : '#334155',
+                    background: status === 'current' ? `${color}10` : status === 'done' ? 'rgba(5,46,22,0.2)' : 'rgba(30,41,59,0.4)',
+                    opacity: status === 'future' ? 0.5 : 1,
+                  }}
+                >
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm flex-shrink-0"
+                    style={{
+                      background: status === 'done' ? '#065f46' : status === 'current' ? `${color}25` : '#1e293b',
+                      border: `2px solid ${status === 'done' ? '#10b981' : color}`,
+                    }}
+                  >
+                    {status === 'done' ? '✅' : icon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-100 flex items-center gap-1.5">{icon} {label}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
+                    <p className={`text-xs font-bold ${status === 'done' ? 'text-emerald-400' : status === 'current' ? 'text-slate-100' : 'text-slate-400'}`}>
+                      {label}
+                    </p>
+                    <p className="text-[10px] text-slate-500">{date}</p>
                   </div>
+                  {status === 'current' && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse flex-shrink-0"
+                      style={{ background: `${color}20`, color: color, border: `1px solid ${color}40` }}>
+                      진행중
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
           </div>
 
+          {/* 주요 안내 */}
+          <div className="mx-6 mt-4 rounded-xl border border-amber-800/40 px-5 py-3.5"
+            style={{ background: 'rgba(120,80,20,0.15)' }}>
+            <p className="text-xs font-bold mb-1.5" style={{ color: 'rgb(214,173,101)' }}>📌 핵심 안내</p>
+            <div className="space-y-1 text-xs text-slate-400 leading-relaxed">
+              <p>• 2차 출제에서 배정된 <span className="text-slate-200 font-bold">3문제 모두 준비</span> 필요</p>
+              <p>• 시험 당일 아침 평가위원회에서 <span className="text-red-400 font-bold">1문제 랜덤 추첨</span></p>
+              <p>• 합격 기준: 평가위원 평균 <span className="font-bold" style={{ color: 'rgb(214,173,101)' }}>70점 이상</span> (100점 + 가점 10점)</p>
+            </div>
+          </div>
+
           {/* 확인 버튼 */}
-          <div className="px-6 py-5 mt-4">
+          <div className="px-6 py-5 mt-3">
             <button
               onClick={() => setShowNotice(false)}
               className="w-full py-3.5 rounded-xl text-base font-bold transition hover:opacity-90 active:scale-95 shadow-lg text-stone-900"
               style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
             >
-              확인했습니다 · 투표 시작하기 →
+              확인했습니다 · 평가자 매뉴얼 보기 →
             </button>
             <p className="text-xs text-slate-600 text-center mt-2">
-              대시보드만 확인하려면 아래 결과 보기 링크를 이용하세요
+              결과 대시보드를 보려면 우측 상단 [결과보기]를 이용하세요
             </p>
           </div>
         </div>
       </div>
-    )}
+      );
+    })()}
 
     {/* ════════════════════════════════════════
         비밀번호 변경 모달
@@ -471,22 +516,35 @@ export default function QSLoginPage() {
     <div className="max-w-lg mx-auto mt-4">
       <div className="bg-slate-800 rounded-2xl shadow-lg border border-slate-700 overflow-hidden">
 
-        {/* 상단 배너 */}
+        {/* 상단 배너 – 인증 평가 진행 안내 */}
         <div className="px-8 py-8 text-center"
           style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}>
-          <div className="text-5xl mb-3">📋</div>
-          <h2 className="text-2xl font-bold mb-2 text-stone-900">TEST 케이스 문제 선정</h2>
-          <p className="text-stone-800 text-sm font-medium">2026년 ASSO 치프인증 1차 출제</p>
-          <p className="text-stone-700 text-xs mt-1">각 분야별 3문제 선택 → 최다득표 순 최종 3문제 확정</p>
+          <div className="text-5xl mb-3">🏆</div>
+          <h2 className="text-2xl font-bold mb-2 text-stone-900">2026 ASSO 치프인증 평가</h2>
+          <p className="text-stone-800 text-sm font-medium">인증 평가 진행 안내 · 평가위원 매뉴얼</p>
+          <p className="text-stone-700 text-xs mt-1">1차 출제 완료 → 2차 출제 → 멘토링 → 인증평가</p>
         </div>
 
-        {/* 마감 완료 배너 */}
-        <div className="px-6 py-4 flex items-center gap-3 border-b border-emerald-900/40"
-          style={{ background: 'linear-gradient(135deg, #022c22 0%, #064e3b 100%)' }}>
-          <span className="text-2xl">✅</span>
+        {/* D-Day 카운터 배너 */}
+        <div className="px-6 py-4 flex items-center gap-3 border-b border-amber-900/40"
+          style={{ background: 'linear-gradient(135deg, #422006 0%, #78350f 100%)' }}>
+          <span className="text-2xl">📅</span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-emerald-300">1차 출제 투표 마감 완료</p>
-            <p className="text-xs text-emerald-600">2026년 2월 26일(목) 오전 12시 · 최종 9문제 확정</p>
+            <p className="text-sm font-bold" style={{ color: 'rgb(214,173,101)' }}>인증평가 시험일: {EXAM_DATE_STR}</p>
+            <p className="text-xs text-amber-600">오전 10:00 시작 · 인터뷰 + PT 발제안</p>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <p className="text-xl font-black" style={{ color: 'rgb(214,173,101)' }}>{examDDay}</p>
+          </div>
+        </div>
+
+        {/* 1차 출제 완료 + 결과보기 */}
+        <div className="px-6 py-3 flex items-center gap-3 border-b border-emerald-900/40"
+          style={{ background: 'linear-gradient(135deg, #022c22 0%, #064e3b 100%)' }}>
+          <span className="text-lg">✅</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-emerald-300">1차 출제 완료 · 9문제 확정</p>
+            <p className="text-xs text-emerald-600">2월 26일 마감 · 분야별 3문제씩</p>
           </div>
           <button onClick={() => navigate('/question-selection/results')}
             className="text-xs font-bold border px-3 py-1.5 rounded-lg transition flex-shrink-0 hover:bg-emerald-900/40"
@@ -515,16 +573,17 @@ export default function QSLoginPage() {
           </button>
         </div>
 
-        {/* 투표 안내 */}
+        {/* 진행 안내 */}
         <div className="px-8 py-4 bg-amber-900/30 border-b border-amber-800/40">
           <div className="flex items-start gap-2">
-            <span className="text-amber-500 mt-0.5 text-base">ℹ️</span>
+            <span className="text-amber-500 mt-0.5 text-base">📌</span>
             <div className="text-xs text-amber-300">
-              <p className="font-semibold mb-1">투표 안내</p>
+              <p className="font-semibold mb-1">앞으로의 진행 일정</p>
               <ul className="space-y-0.5 text-amber-400/80">
-                <li>• 문제은행 21문제 중 분야별 3문제(총 9문제)를 선택합니다</li>
-                <li>• 3개 분야: 주식 이동 / 차명 주식 해소 / 가지급금 정리</li>
-                <li>• 7명 평가위원의 최다득표 순 각 3문제 (총 9문제) 확정</li>
+                <li>• <b>3/18(수)</b> 2차 출제 – 피평가자별 3문제 랜덤 배정</li>
+                <li>• <b>3/18~27</b> 멘토링 기간 (선택사항)</li>
+                <li>• <b>3/28(토)</b> 인증평가 실시 – 최종 1문제 추첨 후 평가</li>
+                <li>• <b>3/31(화)</b> 최종 결과 발표 (합격/불합격)</li>
               </ul>
             </div>
           </div>
