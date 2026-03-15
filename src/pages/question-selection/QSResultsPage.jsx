@@ -2465,7 +2465,7 @@ export default function QSResultsPage() {
       {/* ════════════════════════════════════════════════════════
           5~8단계 인증평가 워크플로우 패널
       ════════════════════════════════════════════════════════ */}
-      {votingConfig.closed && assignments.length > 0 && adminMode && (
+      {votingConfig.closed && adminMode && (
         <div className="mt-8">
           <div
             className="rounded-2xl overflow-hidden border-2 shadow-2xl"
