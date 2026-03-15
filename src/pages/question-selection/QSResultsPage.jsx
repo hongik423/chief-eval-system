@@ -26,6 +26,16 @@ import {
   ROUND2_DATE_STR,
   MENTORING_START,
   MENTORING_END,
+  // 피평가자 추적 시스템
+  loadCandidateTracker,
+  initializeCandidateTracker,
+  getCandidateTrackerSummary,
+  executeFinalDraw,
+  updateCandidateTracker,
+  getCategoryLabel,
+  loadAssignmentsHybrid,
+  loadTrackerHybrid,
+  loadFinalDrawFromSupabase,
 } from '@/lib/qsAssignmentStore';
 
 const ALL_EVALUATORS = ['나동환', '권영도', '권오경', '김홍', '박성현', '윤덕상', '하상현'];
@@ -96,6 +106,12 @@ export default function QSResultsPage() {
   const [isSpinning, setIsSpinning] = useState(false); // 랜덤 배정 애니메이션
   const [spinStep, setSpinStep] = useState(0); // 애니메이션 단계 (0~3)
 
+  // ── 피평가자 단계 추적
+  const [trackerSummary, setTrackerSummary] = useState([]);
+  const [showTracker, setShowTracker] = useState(false);
+  const [drawSpinning, setDrawSpinning] = useState(null); // 4단계 추첨 중인 candidateId
+  const [drawResults, setDrawResults] = useState({}); // { candidateId: { category, questionId } }
+
   // 최신 results를 interval 내부에서 안전하게 참조하기 위한 ref
   const resultsRef = useRef([]);
 
@@ -117,12 +133,56 @@ export default function QSResultsPage() {
   useEffect(() => {
     fetchData();
     setVotingConfig(getVotingConfig());
-    // 저장된 2차 배정 로드
-    const saved = loadAssignmentsLocal();
-    if (saved) {
-      setAssignments(saved.assignments || []);
-      setAssignSavedAt(saved.savedAt);
-    }
+
+    // 하이브리드 로드: localStorage 우선 → Supabase 폴백
+    (async () => {
+      try {
+        // 2차 배정 로드
+        const saved = await loadAssignmentsHybrid();
+        if (saved) {
+          setAssignments(saved.assignments || []);
+          setAssignSavedAt(saved.savedAt);
+        }
+
+        // 피평가자 추적 데이터 로드
+        const tracker = await loadTrackerHybrid();
+        if (!tracker || Object.keys(tracker).length === 0) {
+          initializeCandidateTracker();
+        }
+        setTrackerSummary(getCandidateTrackerSummary());
+
+        // 기존 4단계 추첨 결과 복원 (localStorage + Supabase 모두 확인)
+        const restoredDraws = {};
+        const tr = loadCandidateTracker();
+        Object.entries(tr).forEach(([cid, rec]) => {
+          if (rec.stage4?.selectedQuestionId) {
+            restoredDraws[cid] = {
+              category: rec.stage4.selectedCategory,
+              questionId: rec.stage4.selectedQuestionId,
+            };
+          }
+        });
+
+        // Supabase에서 추가 추첨 결과 보충
+        const supabaseDraws = await loadFinalDrawFromSupabase();
+        Object.entries(supabaseDraws).forEach(([cid, draw]) => {
+          if (!restoredDraws[cid]) {
+            restoredDraws[cid] = draw;
+          }
+        });
+
+        setDrawResults(restoredDraws);
+      } catch (err) {
+        console.warn('[Init] 하이브리드 로드 오류:', err);
+        // 폴백: localStorage만 사용
+        const saved = loadAssignmentsLocal();
+        if (saved) {
+          setAssignments(saved.assignments || []);
+          setAssignSavedAt(saved.savedAt);
+        }
+        setTrackerSummary(getCandidateTrackerSummary());
+      }
+    })();
   }, [fetchData]);
 
   useEffect(() => {
@@ -329,6 +389,31 @@ export default function QSResultsPage() {
     clearAssignmentsLocal();
     setAssignments([]);
     setAssignSavedAt(null);
+  };
+
+  // ── 4단계 최종 1문제 추첨 실행
+  const handleFinalDraw = (candidateId) => {
+    setDrawSpinning(candidateId);
+    // 슬롯머신 스타일 애니메이션 (1.5초 후 결과)
+    setTimeout(() => {
+      try {
+        const result = executeFinalDraw(candidateId, adminName || '평가위원회');
+        setDrawResults((prev) => ({
+          ...prev,
+          [candidateId]: result,
+        }));
+        setTrackerSummary(getCandidateTrackerSummary());
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        setDrawSpinning(null);
+      }
+    }, 1500);
+  };
+
+  // ── 추적 데이터 리프레시
+  const refreshTracker = () => {
+    setTrackerSummary(getCandidateTrackerSummary());
   };
 
   // ── URL 복사
@@ -1444,6 +1529,197 @@ export default function QSResultsPage() {
                   >
                     {copiedToken === 'ALL' ? '✅ 3명 URL 모두 복사됨' : '📋 3명 URL 전체 복사'}
                   </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════
+          피평가자 단계별 추적 대시보드 + 4단계 최종 추첨
+      ════════════════════════════════════════════════════════ */}
+      {votingConfig.closed && assignments.length > 0 && (
+        <div className="mt-8">
+          <div
+            className="rounded-2xl overflow-hidden border-2 shadow-2xl"
+            style={{ borderColor: '#ef4444', background: 'linear-gradient(135deg, #1a0505 0%, #200a0a 100%)' }}
+          >
+            {/* 헤더 */}
+            <div
+              className="px-6 py-5 flex items-center justify-between"
+              style={{ background: 'linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%)' }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">🎯</span>
+                <div>
+                  <h2 className="text-lg font-black text-red-100">피평가자 단계별 추적</h2>
+                  <p className="text-xs text-red-300/70 font-medium">
+                    배정 → 추첨 → 평가 → 결과 · 전 단계 데이터 추적 및 보관
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => { refreshTracker(); setShowTracker(!showTracker); }}
+                className="text-xs px-4 py-2 rounded-lg font-bold border transition"
+                style={{ borderColor: '#fca5a5', color: '#fca5a5', background: showTracker ? 'rgba(239,68,68,0.2)' : 'transparent' }}
+              >
+                {showTracker ? '△ 접기' : '▽ 상세 보기'}
+              </button>
+            </div>
+
+            {/* 피평가자 카드 — 항상 요약 표시 */}
+            <div className="px-6 py-5">
+              <div className="space-y-4">
+                {trackerSummary.map((cs) => {
+                  const draw = drawResults[cs.candidateId];
+                  const isDraw = drawSpinning === cs.candidateId;
+                  const hasAssignment = cs.stage2Questions !== '미배정';
+
+                  return (
+                    <div
+                      key={cs.candidateId}
+                      className="rounded-2xl border overflow-hidden"
+                      style={{ borderColor: draw ? '#166534' : '#374151', background: 'rgba(15,23,42,0.6)' }}
+                    >
+                      {/* 후보자 헤더 */}
+                      <div className="px-5 py-3.5 flex items-center gap-3 border-b" style={{ borderColor: '#1e293b' }}>
+                        <div
+                          className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black flex-shrink-0"
+                          style={{ background: 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)', color: '#fff' }}
+                        >
+                          {cs.name.charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-100">{cs.name}</p>
+                          <p className="text-xs text-slate-500">{cs.team}</p>
+                        </div>
+
+                        {/* 단계 진행 미니 뱃지 */}
+                        <div className="flex items-center gap-1">
+                          {['1차', '2차', '추첨', '평가', '결과'].map((label, idx) => {
+                            const stageKeys = ['stage1', 'stage2', 'stage4', 'stage5', 'stage6'];
+                            const stageData = cs.record?.[stageKeys[idx]];
+                            const done = stageData?.status === 'completed';
+                            const active = stageData?.status === 'in_progress';
+                            return (
+                              <span
+                                key={label}
+                                className="text-[9px] px-1.5 py-0.5 rounded font-bold"
+                                style={{
+                                  background: done ? '#166534' : active ? '#92400e' : '#1e293b',
+                                  color: done ? '#4ade80' : active ? '#fbbf24' : '#475569',
+                                  border: `1px solid ${done ? '#16653480' : active ? '#92400e80' : '#33415580'}`,
+                                }}
+                              >
+                                {done ? '✓' : active ? '►' : '·'} {label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* 데이터 요약 행 */}
+                      <div className="px-5 py-3 grid grid-cols-3 gap-3">
+                        {/* 2차 배정 문제 */}
+                        <div className="text-center">
+                          <p className="text-[10px] text-slate-500 mb-1">2차 배정 문제</p>
+                          <p className="text-sm font-black text-slate-300">{cs.stage2Questions}</p>
+                        </div>
+
+                        {/* 4단계 최종 추첨 */}
+                        <div className="text-center">
+                          <p className="text-[10px] text-slate-500 mb-1">최종 추첨 결과</p>
+                          {isDraw ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="text-lg animate-spin">🎰</span>
+                              <span className="text-xs text-amber-400 animate-pulse">추첨중...</span>
+                            </div>
+                          ) : draw ? (
+                            <div>
+                              <span className="text-lg font-black text-red-400">#{draw.questionId}</span>
+                              <p className="text-[10px] text-red-500/80">{getCategoryLabel(draw.category)}</p>
+                            </div>
+                          ) : (
+                            <div>
+                              <span className="text-sm text-slate-500">미추첨</span>
+                              {adminMode && hasAssignment && (
+                                <button
+                                  onClick={() => handleFinalDraw(cs.candidateId)}
+                                  className="block mx-auto mt-1 text-[10px] px-3 py-1 rounded-lg font-bold transition"
+                                  style={{ background: '#991b1b', color: '#fca5a5' }}
+                                >
+                                  🎰 추첨 실행
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 최종 결과 */}
+                        <div className="text-center">
+                          <p className="text-[10px] text-slate-500 mb-1">평가 결과</p>
+                          <p className={`text-sm font-black ${
+                            cs.stage6Result.includes('합격') ? 'text-emerald-400' :
+                            cs.stage6Result.includes('불합격') ? 'text-red-400' : 'text-slate-500'
+                          }`}>
+                            {cs.stage6Result}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 상세 보기 (접기/펼치기) */}
+                      {showTracker && (
+                        <div className="px-5 py-3 border-t border-slate-700/50 space-y-2">
+                          <p className="text-[10px] text-slate-500 font-bold">변경 이력 ({cs.historyCount}건)</p>
+                          {cs.record?.history?.slice(-5).reverse().map((h, i) => (
+                            <div key={i} className="flex items-start gap-2 text-[10px]">
+                              <span className="text-slate-600 w-32 flex-shrink-0 font-mono">
+                                {new Date(h.timestamp).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                              </span>
+                              <span className="text-slate-400">{h.action}</span>
+                            </div>
+                          ))}
+                          {(!cs.record?.history || cs.record.history.length === 0) && (
+                            <p className="text-[10px] text-slate-600">아직 변경 이력이 없습니다</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 4단계 전체 추첨 버튼 (관리자 전용) */}
+              {adminMode && assignments.length > 0 && Object.keys(drawResults).length < 3 && (
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => {
+                      const undrawn = ROUND2_CANDIDATES.filter(c => !drawResults[c.id]);
+                      undrawn.forEach((c, idx) => {
+                        setTimeout(() => handleFinalDraw(c.id), idx * 2000);
+                      });
+                    }}
+                    disabled={drawSpinning !== null}
+                    className="px-6 py-3 rounded-xl text-sm font-bold text-white transition hover:opacity-90 active:scale-95 disabled:opacity-50 shadow-lg"
+                    style={{ background: 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)' }}
+                  >
+                    🎰 전체 피평가자 최종 추첨 실행 ({3 - Object.keys(drawResults).length}명 남음)
+                  </button>
+                </div>
+              )}
+
+              {/* 추첨 완료 배너 */}
+              {Object.keys(drawResults).length === 3 && (
+                <div
+                  className="mt-4 rounded-xl px-5 py-3 border flex items-center gap-3"
+                  style={{ borderColor: '#166534', background: 'rgba(22,101,52,0.1)' }}
+                >
+                  <span className="text-xl">✅</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-emerald-400">4단계 최종 추첨 완료</p>
+                    <p className="text-xs text-emerald-600">3명 모두 최종 1문제가 확정되었습니다 · 추첨 결과가 저장됨</p>
+                  </div>
                 </div>
               )}
             </div>

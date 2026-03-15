@@ -1,9 +1,14 @@
 // ================================================================
 // 2차 출제 랜덤 배정 스토어
 // - 1차 최종 확정 9문제 풀에서 피평가자별 3문제(분야별 1문제) 랜덤 배정
-// - URL 토큰 방식: {candidateId}-{stQ}-{nsQ}-{tpQ} (Supabase 불필요)
-// - 배정 결과는 localStorage에 캐시 (관리자 재확인용)
+// - URL 토큰 방식: {candidateId}-{stQ}-{nsQ}-{tpQ}
+// - 배정 결과는 localStorage + Supabase 이중 저장 (데이터 영속성 보장)
 // ================================================================
+
+import { supabase } from '@/lib/supabase';
+
+// ─── 현재 활성 평가 기간 ID ──────────────────────────────────────
+const ACTIVE_PERIOD_ID = 'a0000000-0000-0000-0000-000000000001';
 
 // ─── 2차 출제 피평가자 목록 ───────────────────────────────────────
 export const ROUND2_CANDIDATES = [
@@ -160,12 +165,15 @@ export function getQuestionPdfUrl(questionId) {
 
 // ─── 랜덤 배정 생성 ───────────────────────────────────────────────
 function seededRandom(seed) {
-  // 간단한 LCG 난수 (재현 가능)
+  // LCG 난수 (재현 가능) + 워밍업으로 연속 시드 편향 제거
   let s = seed;
-  return function () {
+  const next = function () {
     s = (s * 1664525 + 1013904223) & 0xffffffff;
     return (s >>> 0) / 0xffffffff;
   };
+  // 워밍업: 첫 10회 결과 버림 (연속 시드 편향 해소)
+  for (let i = 0; i < 10; i++) next();
+  return next;
 }
 
 /**
@@ -238,6 +246,83 @@ export function saveAssignmentsLocal(assignments) {
     STORE_KEY,
     JSON.stringify({ assignments, savedAt: new Date().toISOString() })
   );
+  // 2차 배정 확정 시 → 피평가자 추적 데이터에도 자동 동기화
+  assignments.forEach((a) => {
+    updateCandidateTracker(a.candidateId, {
+      stage2: {
+        status: 'completed',
+        stock_transfer: a.stock_transfer,
+        nominee_stock: a.nominee_stock,
+        temporary_payment: a.temporary_payment,
+        assignedAt: a.assignedAt,
+        seed: a.seed,
+      },
+    });
+  });
+  // Supabase에도 비동기 동기화 (실패해도 localStorage는 유지)
+  syncAssignmentsToSupabase(assignments).catch((err) =>
+    console.warn('[Supabase Sync] 2차 배정 동기화 실패:', err)
+  );
+}
+
+// ─── Supabase 동기화: 2차 배정 ─────────────────────────────────
+async function syncAssignmentsToSupabase(assignments) {
+  if (!supabase) return;
+  const rows = assignments.map((a) => ({
+    period_id: ACTIVE_PERIOD_ID,
+    candidate_id: a.candidateId,
+    stock_transfer: a.stock_transfer,
+    nominee_stock: a.nominee_stock,
+    temporary_payment: a.temporary_payment,
+    seed: a.seed,
+    assigned_by: 'system',
+    assigned_at: a.assignedAt,
+  }));
+  const { error } = await supabase
+    .from('qs_round2_assignments')
+    .upsert(rows, { onConflict: 'period_id,candidate_id' });
+  if (error) throw error;
+  console.log('[Supabase Sync] 2차 배정 동기화 완료:', rows.length, '건');
+}
+
+// ─── Supabase에서 2차 배정 로드 (localStorage 유실 시 복구용) ───
+export async function loadAssignmentsFromSupabase() {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('qs_round2_assignments')
+    .select('*')
+    .eq('period_id', ACTIVE_PERIOD_ID);
+  if (error) { console.warn('[Supabase] 2차 배정 로드 실패:', error); return null; }
+  if (!data || data.length === 0) return null;
+  const assignments = data.map((d) => ({
+    candidateId: d.candidate_id,
+    candidateName: ROUND2_CANDIDATES.find((c) => c.id === d.candidate_id)?.name || d.candidate_id,
+    candidateTeam: ROUND2_CANDIDATES.find((c) => c.id === d.candidate_id)?.team || '',
+    stock_transfer: d.stock_transfer,
+    nominee_stock: d.nominee_stock,
+    temporary_payment: d.temporary_payment,
+    assignedAt: d.assigned_at,
+    seed: d.seed,
+  }));
+  return { assignments, savedAt: data[0].assigned_at, source: 'supabase' };
+}
+
+// ─── 하이브리드 로드: localStorage 우선 → Supabase 폴백 ────────
+export async function loadAssignmentsHybrid() {
+  const local = loadAssignmentsLocal();
+  if (local && local.assignments && local.assignments.length > 0) return local;
+  // localStorage 없으면 Supabase에서 복구
+  const remote = await loadAssignmentsFromSupabase();
+  if (remote) {
+    // 복구 데이터를 localStorage에도 캐시
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      assignments: remote.assignments,
+      savedAt: remote.savedAt,
+      recoveredFrom: 'supabase',
+    }));
+    console.log('[Supabase Recovery] 2차 배정 데이터 복구 완료');
+  }
+  return remote;
 }
 
 export function loadAssignmentsLocal() {
@@ -252,3 +337,420 @@ export function loadAssignmentsLocal() {
 export function clearAssignmentsLocal() {
   localStorage.removeItem(STORE_KEY);
 }
+
+// ================================================================
+// 피평가자별 단계 추적 시스템 (Candidate Tracker)
+// - 전 단계 데이터를 중앙 집중식으로 추적·저장·보관
+// - localStorage 키: qs_candidate_tracker
+// - 구조: { [candidateId]: { stage1, stage2, stage4, stage5, stage6, stage7, stage8, history[] } }
+// ================================================================
+const TRACKER_KEY = 'qs_candidate_tracker';
+
+/**
+ * 피평가자 추적 데이터 전체 로드
+ * @returns {{ [candidateId: string]: CandidateRecord }} 전체 추적 데이터
+ */
+export function loadCandidateTracker() {
+  try {
+    const raw = localStorage.getItem(TRACKER_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * 피평가자 추적 데이터 전체 저장 (localStorage + Supabase 이중)
+ */
+export function saveCandidateTracker(tracker) {
+  localStorage.setItem(TRACKER_KEY, JSON.stringify(tracker));
+  // Supabase 비동기 동기화
+  syncTrackerToSupabase(tracker).catch((err) =>
+    console.warn('[Supabase Sync] 피평가자 추적 동기화 실패:', err)
+  );
+}
+
+// ─── Supabase 동기화: 피평가자 추적 ────────────────────────────
+async function syncTrackerToSupabase(tracker) {
+  if (!supabase) return;
+  const rows = Object.values(tracker).map((r) => ({
+    period_id: ACTIVE_PERIOD_ID,
+    candidate_id: r.candidateId,
+    candidate_name: r.name,
+    team: r.team,
+    current_stage: calculateCurrentStageNum(r),
+    stage1_data: r.stage1 || { status: 'pending' },
+    stage2_data: r.stage2 || { status: 'pending' },
+    stage3_data: r.stage3 || { status: 'pending' },
+    stage4_data: r.stage4 || { status: 'pending' },
+    stage5_data: r.stage5 || { status: 'pending' },
+    stage6_data: r.stage6 || { status: 'pending' },
+    stage7_data: r.stage7 || { status: 'pending' },
+    stage8_data: r.stage8 || { status: 'pending' },
+    history: r.history || [],
+  }));
+  const { error } = await supabase
+    .from('qs_candidate_tracker')
+    .upsert(rows, { onConflict: 'period_id,candidate_id' });
+  if (error) throw error;
+}
+
+/** 레코드에서 현재 진행 단계 번호 계산 (1~8) */
+function calculateCurrentStageNum(record) {
+  const stages = ['stage8', 'stage7', 'stage6', 'stage5', 'stage4', 'stage3', 'stage2', 'stage1'];
+  const nums   = [8, 7, 6, 5, 4, 3, 2, 1];
+  for (let i = 0; i < stages.length; i++) {
+    const s = record[stages[i]];
+    if (s && (s.status === 'completed' || s.status === 'in_progress')) {
+      return nums[i];
+    }
+  }
+  return 1;
+}
+
+// ─── Supabase에서 피평가자 추적 로드 (복구용) ──────────────────
+export async function loadTrackerFromSupabase() {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('qs_candidate_tracker')
+    .select('*')
+    .eq('period_id', ACTIVE_PERIOD_ID);
+  if (error) { console.warn('[Supabase] 추적 데이터 로드 실패:', error); return null; }
+  if (!data || data.length === 0) return null;
+  const tracker = {};
+  data.forEach((d) => {
+    tracker[d.candidate_id] = {
+      candidateId: d.candidate_id,
+      name: d.candidate_name,
+      team: d.team,
+      createdAt: d.created_at,
+      lastUpdated: d.updated_at,
+      stage1: d.stage1_data,
+      stage2: d.stage2_data,
+      stage3: d.stage3_data,
+      stage4: d.stage4_data,
+      stage5: d.stage5_data,
+      stage6: d.stage6_data,
+      stage7: d.stage7_data,
+      stage8: d.stage8_data,
+      history: d.history || [],
+    };
+  });
+  return tracker;
+}
+
+// ─── 하이브리드 추적 로드: localStorage → Supabase 폴백 ────────
+export async function loadTrackerHybrid() {
+  const local = loadCandidateTracker();
+  if (local && Object.keys(local).length > 0) return local;
+  const remote = await loadTrackerFromSupabase();
+  if (remote) {
+    localStorage.setItem(TRACKER_KEY, JSON.stringify(remote));
+    console.log('[Supabase Recovery] 피평가자 추적 데이터 복구 완료');
+  }
+  return remote || {};
+}
+
+/**
+ * 특정 피평가자의 추적 데이터 업데이트
+ * @param {string} candidateId - 피평가자 ID (kcg, bjy, yhh)
+ * @param {object} update - 업데이트할 단계 데이터 (deep merge)
+ */
+export function updateCandidateTracker(candidateId, update) {
+  const tracker = loadCandidateTracker();
+  const candidate = ROUND2_CANDIDATES.find((c) => c.id === candidateId);
+  if (!candidate) return;
+
+  // 기존 데이터 가져오기 (없으면 초기화)
+  const existing = tracker[candidateId] || createEmptyRecord(candidateId, candidate.name, candidate.team);
+
+  // 히스토리에 변경 이력 추가
+  const historyEntry = {
+    timestamp: new Date().toISOString(),
+    action: Object.keys(update).join(', '),
+    data: JSON.parse(JSON.stringify(update)),
+  };
+  existing.history = existing.history || [];
+  existing.history.push(historyEntry);
+  existing.lastUpdated = new Date().toISOString();
+
+  // 단계별 데이터 deep merge
+  Object.keys(update).forEach((key) => {
+    if (key === 'history') return; // history는 별도 관리
+    existing[key] = { ...(existing[key] || {}), ...update[key] };
+  });
+
+  tracker[candidateId] = existing;
+  saveCandidateTracker(tracker);
+  return tracker;
+}
+
+/**
+ * 빈 피평가자 레코드 생성
+ */
+function createEmptyRecord(candidateId, name, team) {
+  return {
+    candidateId,
+    name,
+    team,
+    createdAt: new Date().toISOString(),
+    lastUpdated: new Date().toISOString(),
+
+    // ─── 1단계: 1차 출제 (문제 선정) ───
+    stage1: {
+      status: 'completed',       // 이미 완료
+      finalQuestions: {
+        stock_transfer: [4, 5, 12],
+        nominee_stock: [3, 1, 10],
+        temporary_payment: [6, 11, 2],
+      },
+      completedAt: '2026-02-26T00:00:00.000Z',
+    },
+
+    // ─── 2단계: 2차 출제 (랜덤 배정) ───
+    stage2: {
+      status: 'pending',
+      stock_transfer: null,      // 배정된 문제 번호
+      nominee_stock: null,
+      temporary_payment: null,
+      assignedAt: null,
+      seed: null,
+    },
+
+    // ─── 3단계: 멘토링 ───
+    stage3: {
+      status: 'pending',
+      sessions: [],              // [{ date, mentorId, mentorName, topics, notes }]
+    },
+
+    // ─── 4단계: 최종 1문제 추첨 ───
+    stage4: {
+      status: 'pending',
+      selectedCategory: null,    // 추첨된 분야 (stock_transfer / nominee_stock / temporary_payment)
+      selectedQuestionId: null,  // 추첨된 문제 번호
+      selectedAt: null,          // 추첨 시각
+      selectedBy: null,          // 추첨 실행자
+    },
+
+    // ─── 5단계: 인증평가 실시 ───
+    stage5: {
+      status: 'pending',
+      evaluationStarted: null,
+      evaluationCompleted: null,
+    },
+
+    // ─── 6단계: 평가위원 협의 ───
+    stage6: {
+      status: 'pending',
+      finalAverage: null,        // 최종 평균 점수
+      bonusScore: null,          // 가점
+      passStatus: null,          // 'passed' | 'failed' | null
+      decidedAt: null,
+      consensusNotes: null,
+    },
+
+    // ─── 7단계: 최종 결과 발표 ───
+    stage7: {
+      status: 'pending',
+      announcedAt: null,
+      feedback: null,
+    },
+
+    // ─── 8단계: 인증서 수여식 ───
+    stage8: {
+      status: 'pending',
+      certificateNumber: null,
+      issuedAt: null,
+      ceremonyDate: null,
+    },
+
+    // ─── 변경 이력 ───
+    history: [],
+  };
+}
+
+/**
+ * 전체 피평가자 추적 데이터 초기화 (3명 모두)
+ */
+export function initializeCandidateTracker() {
+  const tracker = {};
+  ROUND2_CANDIDATES.forEach((c) => {
+    tracker[c.id] = createEmptyRecord(c.id, c.name, c.team);
+  });
+
+  // 기존 2차 배정 데이터가 있으면 동기화
+  const saved = loadAssignmentsLocal();
+  if (saved && saved.assignments) {
+    saved.assignments.forEach((a) => {
+      if (tracker[a.candidateId]) {
+        tracker[a.candidateId].stage2 = {
+          status: 'completed',
+          stock_transfer: a.stock_transfer,
+          nominee_stock: a.nominee_stock,
+          temporary_payment: a.temporary_payment,
+          assignedAt: a.assignedAt,
+          seed: a.seed,
+        };
+      }
+    });
+  }
+
+  saveCandidateTracker(tracker);
+  return tracker;
+}
+
+/**
+ * 특정 피평가자의 현재 진행 단계 계산
+ */
+export function getCandidateCurrentStage(candidateId) {
+  const tracker = loadCandidateTracker();
+  const record = tracker[candidateId];
+  if (!record) return null;
+
+  // 역순으로 완료된 가장 높은 단계 찾기
+  const stages = [
+    { key: 'stage8', label: '인증서 수여' },
+    { key: 'stage7', label: '결과 발표' },
+    { key: 'stage6', label: '평가위원 협의' },
+    { key: 'stage5', label: '인증평가 실시' },
+    { key: 'stage4', label: '최종 추첨' },
+    { key: 'stage3', label: '멘토링' },
+    { key: 'stage2', label: '2차 출제' },
+    { key: 'stage1', label: '1차 출제' },
+  ];
+
+  for (const s of stages) {
+    if (record[s.key]?.status === 'completed' || record[s.key]?.status === 'in_progress') {
+      return { ...s, status: record[s.key].status };
+    }
+  }
+  return { key: 'stage1', label: '1차 출제', status: 'pending' };
+}
+
+/**
+ * 4단계 최종 1문제 추첨 실행 및 저장
+ * @param {string} candidateId - 피평가자 ID
+ * @param {string} selectedBy - 추첨 실행자 이름
+ * @returns {{ category: string, questionId: number }} 추첨 결과
+ */
+export function executeFinalDraw(candidateId, selectedBy = '평가위원회') {
+  const tracker = loadCandidateTracker();
+  const record = tracker[candidateId];
+  if (!record || !record.stage2?.stock_transfer) {
+    throw new Error('2차 출제 배정이 먼저 완료되어야 합니다.');
+  }
+
+  // 배정된 3문제에서 랜덤 1문제 추첨
+  const assignedQuestions = [
+    { category: 'stock_transfer', questionId: record.stage2.stock_transfer },
+    { category: 'nominee_stock', questionId: record.stage2.nominee_stock },
+    { category: 'temporary_payment', questionId: record.stage2.temporary_payment },
+  ];
+
+  const seed = Date.now();
+  const rand = seededRandom(seed);
+  const selectedIdx = Math.floor(rand() * assignedQuestions.length);
+  const selected = assignedQuestions[selectedIdx];
+
+  const selectedAt = new Date().toISOString();
+
+  // localStorage 추적 저장
+  updateCandidateTracker(candidateId, {
+    stage4: {
+      status: 'completed',
+      selectedCategory: selected.category,
+      selectedQuestionId: selected.questionId,
+      selectedAt,
+      selectedBy,
+      seed,
+      allAssigned: assignedQuestions, // 참고용: 배정된 3문제 기록
+    },
+  });
+
+  // Supabase에도 비동기 동기화
+  syncFinalDrawToSupabase(candidateId, selected, seed, selectedBy, selectedAt, assignedQuestions)
+    .catch((err) => console.warn('[Supabase Sync] 4단계 추첨 동기화 실패:', err));
+
+  return selected;
+}
+
+// ─── Supabase 동기화: 4단계 추첨 ───────────────────────────────
+async function syncFinalDrawToSupabase(candidateId, selected, seed, selectedBy, selectedAt, allAssigned) {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('qs_final_draw')
+    .upsert({
+      period_id: ACTIVE_PERIOD_ID,
+      candidate_id: candidateId,
+      selected_category: selected.category,
+      selected_question_id: selected.questionId,
+      seed,
+      selected_by: selectedBy,
+      selected_at: selectedAt,
+      all_assigned: allAssigned,
+    }, { onConflict: 'period_id,candidate_id' });
+  if (error) throw error;
+  console.log('[Supabase Sync] 4단계 추첨 동기화 완료:', candidateId);
+}
+
+// ─── Supabase에서 4단계 추첨 결과 로드 ─────────────────────────
+export async function loadFinalDrawFromSupabase() {
+  if (!supabase) return {};
+  const { data, error } = await supabase
+    .from('qs_final_draw')
+    .select('*')
+    .eq('period_id', ACTIVE_PERIOD_ID);
+  if (error) { console.warn('[Supabase] 추첨 결과 로드 실패:', error); return {}; }
+  const results = {};
+  (data || []).forEach((d) => {
+    results[d.candidate_id] = {
+      category: d.selected_category,
+      questionId: d.selected_question_id,
+      selectedAt: d.selected_at,
+      selectedBy: d.selected_by,
+      seed: d.seed,
+    };
+  });
+  return results;
+}
+
+/**
+ * 피평가자별 전체 추적 데이터 요약 (관리자 대시보드용)
+ */
+export function getCandidateTrackerSummary() {
+  const tracker = loadCandidateTracker();
+  return ROUND2_CANDIDATES.map((c) => {
+    const record = tracker[c.id] || createEmptyRecord(c.id, c.name, c.team);
+    const stageStatus = getCandidateCurrentStage(c.id);
+
+    return {
+      candidateId: c.id,
+      name: c.name,
+      team: c.team,
+      currentStage: stageStatus,
+      stage2Questions: record.stage2?.stock_transfer
+        ? `#${record.stage2.stock_transfer}, #${record.stage2.nominee_stock}, #${record.stage2.temporary_payment}`
+        : '미배정',
+      stage4Selected: record.stage4?.selectedQuestionId
+        ? `#${record.stage4.selectedQuestionId} (${getCategoryLabel(record.stage4.selectedCategory)})`
+        : '미추첨',
+      stage6Result: record.stage6?.passStatus
+        ? `${record.stage6.passStatus === 'passed' ? '합격' : '불합격'} (${record.stage6.finalAverage}점)`
+        : '미결정',
+      historyCount: (record.history || []).length,
+      lastUpdated: record.lastUpdated,
+      record, // 원본 데이터 (상세 보기용)
+    };
+  });
+}
+
+/** 분야 키 → 한글 라벨 변환 */
+function getCategoryLabel(catKey) {
+  const labels = {
+    stock_transfer: '주식 이동',
+    nominee_stock: '차명 주식',
+    temporary_payment: '가지급금',
+  };
+  return labels[catKey] || catKey;
+}
+export { getCategoryLabel };
