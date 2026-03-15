@@ -657,7 +657,7 @@ export default function QSResultsPage() {
       <div className="max-w-4xl mx-auto mt-16 text-center">
         <div className="text-5xl mb-4 animate-spin inline-block">⏳</div>
         <p className="text-slate-400">투표 결과를 불러오는 중...</p>
-        <p className="text-[10px] text-slate-600 mt-6">빌드: 2026-03-15-stage5to8</p>
+        <p className="text-[10px] text-slate-600 mt-6">빌드: 2026-03-15-v2-public</p>
       </div>
     );
   }
@@ -2465,7 +2465,7 @@ export default function QSResultsPage() {
       {/* ════════════════════════════════════════════════════════
           5~8단계 인증평가 워크플로우 패널
       ════════════════════════════════════════════════════════ */}
-      {votingConfig.closed && adminMode && (
+      {votingConfig.closed && (
         <div className="mt-8">
           <div
             className="rounded-2xl overflow-hidden border-2 shadow-2xl"
@@ -2524,7 +2524,7 @@ export default function QSResultsPage() {
                               </p>
                             </div>
                             <div className="flex gap-2">
-                              {!isStarted && (
+                              {adminMode && !isStarted && (
                                 <button
                                   onClick={() => handleStartEval(cs.candidateId)}
                                   className="text-[11px] px-3 py-1.5 rounded-lg font-bold border transition hover:opacity-80"
@@ -2533,7 +2533,7 @@ export default function QSResultsPage() {
                                   ▶ 평가 시작
                                 </button>
                               )}
-                              {isStarted && !isCompleted && (
+                              {adminMode && isStarted && !isCompleted && (
                                 <button
                                   onClick={() => handleCompleteEval(cs.candidateId)}
                                   className="text-[11px] px-3 py-1.5 rounded-lg font-bold border transition hover:opacity-80"
@@ -3241,7 +3241,7 @@ export default function QSResultsPage() {
       )}
 
       {/* 빌드 버전 (배포 검증용) */}
-      <p className="text-[10px] text-slate-600 text-center py-4">빌드: 2026-03-15-stage5to8</p>
+      <p className="text-[10px] text-slate-600 text-center py-4">빌드: 2026-03-15-v2-public</p>
     </div>
   );
 }
