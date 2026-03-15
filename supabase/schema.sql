@@ -420,7 +420,7 @@ INSERT INTO chief_evaluators (id, name, role, team, email, password_hash) VALUES
   ('kyd', '권영도', '평가위원', 'B팀', null, '$2b$10$TX4twY0qvnO0EbxldUtBs.6py5DcZfu8uUryJgQ/uIIq1.nQNKQBK'),
   ('kok', '권오경', '평가위원', 'C팀', null, '$2b$10$MNjDFxfSrthV7uLzKqmVeext7irpBZq8j.ZBiD8Q2wWILiPMG8Jxi'),
   ('kh',  '김홍',   '평가위원', '컨설팅6본부', null, '$2b$10$5kt6hqrlA4luDsr3K4z5b.pQAMLU8PLV67HO6O2KNUYrPVITTZ8Ly'),
-  ('kjh', '강지훈', '평가위원', '미정', null, '$2b$10$0VYQbiEu9SIoe6NSk483aO23AkV3ZASRZ4DSaM3huOMo1DVi9Ygz.'),
+  ('kjh', '강지훈', '평가위원', '임원실', null, '$2b$10$0VYQbiEu9SIoe6NSk483aO23AkV3ZASRZ4DSaM3huOMo1DVi9Ygz.'),
   ('psh', '박성현', '평가위원', 'D팀', null, '$2b$10$s1ZwNngGrlAESKskmVdHme2YF1KvtadNXYkfM1JcpX5tj/KhXEXhW'),
   ('yds', '윤덕상', '평가위원', 'E팀', null, '$2b$10$gJaSoFg0udNY1jjbBVnfy.kBjYnTi7LbzJM9iaf/GWnxCRfOF3SQi'),
   ('hsh', '하상현', '평가위원', 'F팀', null, '$2b$10$gLmdtAacJMH.7InirA8AfeLAR5XsEnnWoL71Xg.7pqiwquJiQohPW');
@@ -429,7 +429,7 @@ INSERT INTO chief_evaluators (id, name, role, team, email, password_hash) VALUES
 INSERT INTO chief_candidates (id, name, team, phone, email, period_id, status) VALUES
   ('kcg', '김창곤', '컨설팅6본부',     '010-9845-9183', 'kcg@stellain.com', 'a0000000-0000-0000-0000-000000000001', 'registered'),
   ('bjy', '백진영', '미정',           null,             null,                'a0000000-0000-0000-0000-000000000001', 'registered'),
-  ('yhh', '양현호', '월드클래스코리아', '010-3794-0404', 'yhh@stellain.com', 'a0000000-0000-0000-0000-000000000001', 'registered');
+  ('yhh', '양현호', 'C팀', '010-3794-0404', 'yhh@stellain.com', 'a0000000-0000-0000-0000-000000000001', 'registered');
 
 -- 4) 평가 기준 섹션
 INSERT INTO chief_eval_criteria_sections (id, period_id, label, max_score, eval_method, sort_order) VALUES

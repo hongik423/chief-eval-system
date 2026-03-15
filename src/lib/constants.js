@@ -7,7 +7,7 @@ export const DEFAULT_EVALUATORS = [
   { id: 'kyd', name: '권영도', role: '평가위원', team: 'B팀' },
   { id: 'kok', name: '권오경', role: '평가위원', team: 'C팀' },
   { id: 'kh',  name: '김홍',   role: '평가위원', team: '컨설팅6본부' },
-  { id: 'kjh', name: '강지훈', role: '평가위원', team: '미정' },
+  { id: 'kjh', name: '강지훈', role: '평가위원', team: '임원실' },
   { id: 'psh', name: '박성현', role: '평가위원', team: 'D팀' },
   { id: 'yds', name: '윤덕상', role: '평가위원', team: 'E팀' },
   { id: 'hsh', name: '하상현', role: '평가위원', team: 'F팀' },
@@ -17,7 +17,7 @@ export const DEFAULT_EVALUATORS = [
 export const DEFAULT_CANDIDATES = [
   { id: 'kcg', name: '김창곤', team: '컨설팅6본부',     phone: '010-9845-9183', email: 'kcg@stellain.com', status: 'registered' },
   { id: 'bjy', name: '백진영', team: '미정',           phone: null, email: null, status: 'registered' },
-  { id: 'yhh', name: '양현호', team: '월드클래스코리아', phone: '010-3794-0404', email: 'yhh@stellain.com', status: 'registered' },
+  { id: 'yhh', name: '양현호', team: 'C팀', phone: '010-3794-0404', email: 'yhh@stellain.com', status: 'registered' },
 ];
 
 // ─── 기본 평가 기준 (수정 가능 구조) ───

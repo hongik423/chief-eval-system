@@ -18,6 +18,7 @@ import {
   SCHEDULE_MILESTONES,
   getCurrentStep,
 } from '@/lib/qsAssignmentStore';
+import { ADMIN_ID, ADMIN_PASSWORD } from '@/lib/constants';
 
 export default function QSLoginPage() {
   const navigate = useNavigate();
@@ -41,6 +42,21 @@ export default function QSLoginPage() {
   const [pwError, setPwError] = useState('');
   const [pwShowCurrent, setPwShowCurrent] = useState(false);
   const [pwShowNew, setPwShowNew] = useState(false);
+
+  // 관리자 로그인 (QS 페이지에서 직접 로그인)
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminId, setAdminId] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminError, setAdminError] = useState('');
+  const [adminLoading, setAdminLoading] = useState(false);
+
+  // 메인 앱 관리자: 로그인 없이 바로 진입
+  useEffect(() => {
+    if (localStorage.getItem('chief_eval_admin')) {
+      sessionStorage.setItem('qs_evaluator', JSON.stringify({ id: 'admin', name: '관리자', role: '관리자' }));
+      navigate('/question-selection/results', { replace: true });
+    }
+  }, [navigate]);
 
   useEffect(() => {
     const tick = () => {
@@ -121,6 +137,25 @@ export default function QSLoginPage() {
     if (pwNew === ev.defaultPassword) { setPwError('초기 비밀번호와 동일합니다. 다른 비밀번호를 사용해주세요.'); return; }
     changeEvaluatorPassword(pwTargetId, pwNew);
     setPwStep(3);
+  };
+
+  // 관리자 로그인 (메인 앱과 동일한 ADMIN_ID / ADMIN_PASSWORD)
+  const handleAdminLogin = (e) => {
+    e.preventDefault();
+    setAdminError('');
+    if (!adminId?.trim()) { setAdminError('관리자 아이디를 입력하세요.'); return; }
+    if (!adminPassword?.trim()) { setAdminError('비밀번호를 입력하세요.'); return; }
+    setAdminLoading(true);
+    setTimeout(() => {
+      if (adminId.trim() === ADMIN_ID && adminPassword === ADMIN_PASSWORD) {
+        try { localStorage.setItem('chief_eval_admin', '1'); } catch (_) {}
+        sessionStorage.setItem('qs_evaluator', JSON.stringify({ id: 'admin', name: '관리자', role: '관리자' }));
+        navigate('/question-selection/results', { replace: true });
+      } else {
+        setAdminError('아이디 또는 비밀번호가 올바르지 않습니다.');
+      }
+      setAdminLoading(false);
+    }, 300);
   };
 
   const selectedEv = QS_EVALUATORS.find((e) => e.id === selectedId);
@@ -691,6 +726,59 @@ export default function QSLoginPage() {
             </button>
           )}
         </form>
+
+        {/* 관리자 로그인 */}
+        <div className="px-8 py-4 border-t border-slate-700">
+          {!showAdminLogin ? (
+            <button
+              type="button"
+              onClick={() => setShowAdminLogin(true)}
+              className="text-sm text-slate-500 hover:text-amber-500 transition-colors flex items-center gap-1.5"
+            >
+              👑 관리자 로그인
+            </button>
+          ) : (
+            <div className="space-y-3 p-4 rounded-lg border border-amber-800/50 bg-amber-900/20">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-amber-400">👑 관리자 로그인</span>
+                <button
+                  type="button"
+                  onClick={() => { setShowAdminLogin(false); setAdminError(''); setAdminId(''); setAdminPassword(''); }}
+                  className="text-xs text-slate-500 hover:text-slate-400"
+                >
+                  닫기
+                </button>
+              </div>
+              <form onSubmit={handleAdminLogin} className="space-y-2">
+                <input
+                  type="text"
+                  value={adminId}
+                  onChange={(e) => setAdminId(e.target.value)}
+                  placeholder="관리자 아이디"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 placeholder-slate-500 text-sm outline-none focus:border-amber-600"
+                />
+                <input
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="비밀번호"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 placeholder-slate-500 text-sm outline-none focus:border-amber-600"
+                />
+                {adminError && (
+                  <p className="text-xs text-red-400">⚠️ {adminError}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={adminLoading}
+                  className="w-full py-2 rounded-lg text-sm font-bold text-stone-900 disabled:opacity-50"
+                  style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
+                >
+                  {adminLoading ? '확인 중...' : '관리자로 로그인'}
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
 
         {/* 하단 링크 */}
         <div className="px-8 py-4 bg-slate-700/40 border-t border-slate-700 flex items-center justify-between">

@@ -121,21 +121,28 @@ export async function submitVote(evaluatorId, evaluatorName, votes) {
   if (error) throw error;
 }
 
-// 투표 현황 조회
+// 투표 현황 조회 (Supabase 미설정/테이블 없음 시 기본값 반환)
 export async function getVoteStatus() {
-  if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.');
-
-  const { data, error } = await supabase
-    .from('qs_votes')
-    .select('evaluator_name');
-
-  if (error) throw error;
-
-  return {
-    totalEvaluators: 7,
-    votedEvaluators: data.map((v) => v.evaluator_name),
-    votedCount: data.length,
-  };
+  if (!supabase) {
+    return { totalEvaluators: 7, votedEvaluators: [], votedCount: 0 };
+  }
+  try {
+    const { data, error } = await supabase
+      .from('qs_votes')
+      .select('evaluator_name');
+    if (error) {
+      console.warn('[qsVoteStore] 투표 현황 조회 실패:', error);
+      return { totalEvaluators: 7, votedEvaluators: [], votedCount: 0 };
+    }
+    return {
+      totalEvaluators: 7,
+      votedEvaluators: (data || []).map((v) => v.evaluator_name),
+      votedCount: (data || []).length,
+    };
+  } catch (err) {
+    console.warn('[qsVoteStore] getVoteStatus 오류:', err);
+    return { totalEvaluators: 7, votedEvaluators: [], votedCount: 0 };
+  }
 }
 
 // 특정 평가위원의 투표 조회
@@ -152,24 +159,39 @@ export async function getEvaluatorVote(evaluatorId) {
   return data || null;
 }
 
-// 카테고리별 결과 집계
+// 카테고리별 결과 집계 (Supabase 미설정/테이블 없음 시 빈 결과 반환)
 // 정책: 각 평가위원이 카테고리별 3문제를 선택하므로 배열을 순회해 집계
 export async function getResults() {
-  if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.');
-
-  const { data: votes, error } = await supabase
-    .from('qs_votes')
-    .select('*');
-
-  if (error) throw error;
-
   const categories = [
     { type: 'stock_transfer', label: '주식 이동 프로젝트 설계', field: 'stock_transfer' },
     { type: 'nominee_stock', label: '차명 주식 해소 프로젝트 설계', field: 'nominee_stock' },
     { type: 'temporary_payment', label: '가지급금 정리 프로젝트 설계', field: 'temporary_payment' },
   ];
 
-  return categories.map(({ type, label, field }) => {
+  if (!supabase) {
+    return categories.map(({ type, label }) => ({
+      category: type,
+      categoryLabel: label,
+      selectedQuestions: [],
+      allVotes: [],
+    }));
+  }
+  try {
+    const { data: votesData, error } = await supabase
+      .from('qs_votes')
+      .select('*');
+    if (error) {
+      console.warn('[qsVoteStore] 결과 조회 실패:', error);
+      return categories.map(({ type, label }) => ({
+        category: type,
+        categoryLabel: label,
+        selectedQuestions: [],
+        allVotes: [],
+      }));
+    }
+    const votes = votesData || [];
+
+    return categories.map(({ type, label, field }) => {
     const voteMap = new Map();
 
     votes.forEach((v) => {
@@ -201,4 +223,13 @@ export async function getResults() {
       allVotes,
     };
   });
+  } catch (err) {
+    console.warn('[qsVoteStore] getResults 오류:', err);
+    return categories.map(({ type, label }) => ({
+      category: type,
+      categoryLabel: label,
+      selectedQuestions: [],
+      allVotes: [],
+    }));
+  }
 }

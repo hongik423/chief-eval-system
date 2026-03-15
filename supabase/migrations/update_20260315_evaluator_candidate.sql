@@ -17,7 +17,7 @@ VALUES (
   'kjh',
   '강지훈',
   '평가위원',
-  '미정',
+  '임원실',
   null,
   '$2b$10$0VYQbiEu9SIoe6NSk483aO23AkV3ZASRZ4DSaM3huOMo1DVi9Ygz.'
 )
@@ -33,7 +33,7 @@ SELECT
   'a0000000-0000-0000-0000-000000000001',
   'kjh',
   ca.id,
-  CASE WHEN '미정' = ca.team AND ca.team != '대표' THEN true ELSE false END
+  CASE WHEN '임원실' = ca.team AND ca.team != '대표' THEN true ELSE false END
 FROM chief_candidates ca
 WHERE ca.period_id = 'a0000000-0000-0000-0000-000000000001'
 ON CONFLICT DO NOTHING;

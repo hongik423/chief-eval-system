@@ -29,7 +29,7 @@ function seededRandom(seed) {
 const ROUND2_CANDIDATES = [
   { id: 'kcg', name: '김창곤', team: '컨설팅6본부' },
   { id: 'bjy', name: '백진영', team: '미정' },
-  { id: 'yhh', name: '양현호', team: '월드클래스코리아' },
+  { id: 'yhh', name: '양현호', team: 'C팀' },
 ];
 
 const ROUND2_QUESTION_POOL = {

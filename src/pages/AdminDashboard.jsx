@@ -1095,7 +1095,7 @@ function ReportTab({ candidateResults, criteriaSections }) {
               <Button
                 size="sm"
                 onClick={() => handleGenerate(result)}
-                disabled={generating != null || result.evalCount === 0}
+                disabled={generating != null || !result.evaluatorDetails?.some(ed => ed.isComplete)}
               >
                 {generating === result.candidate.id ? '생성 중...' : '보고서 생성'}
               </Button>

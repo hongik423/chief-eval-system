@@ -29,7 +29,13 @@ export default function QSVotePage() {
       return;
     }
 
-    const stored = sessionStorage.getItem('qs_evaluator');
+    let stored = sessionStorage.getItem('qs_evaluator');
+    // 메인 앱 관리자: 로그인 없이 접근 허용
+    if (!stored && localStorage.getItem('chief_eval_admin')) {
+      const adminEv = { id: 'admin', name: '관리자', role: '관리자' };
+      sessionStorage.setItem('qs_evaluator', JSON.stringify(adminEv));
+      stored = JSON.stringify(adminEv);
+    }
     if (!stored) {
       navigate('/question-selection');
       return;

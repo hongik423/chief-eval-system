@@ -41,8 +41,15 @@ export const useStore = create((set, get) => ({
   // ═══════════════════════════════
   // Auth Actions
   // ═══════════════════════════════
-  login: (userId, admin) => set({ currentUser: userId, isAdmin: admin }),
-  logout: () => set({ currentUser: null, isAdmin: false }),
+  login: (userId, admin) => {
+    set({ currentUser: userId, isAdmin: admin });
+    if (admin) try { localStorage.setItem('chief_eval_admin', '1'); } catch (_) {}
+    else try { localStorage.removeItem('chief_eval_admin'); } catch (_) {}
+  },
+  logout: () => {
+    set({ currentUser: null, isAdmin: false });
+    try { localStorage.removeItem('chief_eval_admin'); } catch (_) {}
+  },
 
   loginWithPassword: async (evaluatorId, password, asAdmin = false, adminId = '') => {
     const state = get();
@@ -50,6 +57,7 @@ export const useStore = create((set, get) => ({
       if (adminId !== ADMIN_ID) throw new Error('관리자 아이디가 일치하지 않습니다.');
       if (password !== ADMIN_PASSWORD) throw new Error('관리자 비밀번호가 일치하지 않습니다.');
       set({ currentUser: 'admin', isAdmin: true });
+      try { localStorage.setItem('chief_eval_admin', '1'); } catch (_) {}
       return;
     }
     const ev = (state.evaluators || []).find(e => e.id === evaluatorId)
@@ -233,6 +241,10 @@ export const useStore = create((set, get) => ({
   },
 
   isExcluded: (evaluatorId, candidateId) => {
+    // 수동 제외: 권영도 평가위원 → 백진영 피평가자 (동일 소속)
+    const MANUAL_EXCLUSIONS = [['kyd', 'bjy']];
+    if (MANUAL_EXCLUSIONS.some(([e, c]) => e === evaluatorId && c === candidateId)) return true;
+
     const { evaluators, candidates } = get();
     const ev = evaluators.find(e => e.id === evaluatorId);
     const ca = candidates.find(c => c.id === candidateId);

@@ -73,7 +73,7 @@ export default function LoginPage() {
               style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
             >
               <div className="text-3xl mb-2">📢</div>
-              <h2 className="text-2xl font-extrabold text-surface-0">TEST 케이스 문제 선정 공지</h2>
+              <h2 className="text-2xl font-extrabold text-surface-0">제2기 치프 인증 3월 18일 2차 출제 이후 일정 안내</h2>
               <p className="text-sm text-surface-0/80 mt-1">로그인 후 상단 네비바 중간 [TEST 문제 선정]을 먼저 진행해 주세요.</p>
             </div>
 
@@ -194,7 +194,7 @@ export default function LoginPage() {
                 </div>
             <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold text-white">{ev.name} <span className="text-slate-500 font-normal">({ev.id})</span></div>
-                <div className="text-[11px] text-slate-500">{ev.role} · {ev.team}</div>
+                <div className="text-[11px] text-slate-500">{ev.role} · {ev.id === 'kjh' && ev.team === '미정' ? '임원실' : ev.team}</div>
               </div>
                 {selectedId === ev.id && !isAdmin && (
                   <span className="text-brand-400 text-base">✓</span>

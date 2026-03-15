@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026년 기업의별 치프인증 BARS 평가표</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background: #f0f4f8; color: #1a202c; font-size: 14px; }
+
+  .page-header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%);
+    color: white; padding: 32px 40px; text-align: center;
+  }
+  .page-header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; }
+  .page-header p { font-size: 14px; opacity: 0.85; }
+  .badge-row { display: flex; justify-content: center; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+  .badge { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 20px; padding: 6px 16px; font-size: 13px; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 20px; }
+
+  /* 합격기준 안내 */
+  .pass-guide {
+    background: white; border-radius: 12px; padding: 20px 28px;
+    border-left: 5px solid #2563eb; margin-bottom: 28px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .pass-guide h3 { color: #2563eb; font-size: 15px; margin-bottom: 12px; }
+  .pass-table { width: 100%; border-collapse: collapse; }
+  .pass-table th, .pass-table td { border: 1px solid #e2e8f0; padding: 8px 14px; text-align: center; font-size: 13px; }
+  .pass-table th { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+  .pass-table td.pass { color: #16a34a; font-weight: 700; }
+  .pass-table td.fail { color: #dc2626; font-weight: 600; }
+
+  /* 섹션 헤더 */
+  .section-header {
+    border-radius: 10px; padding: 16px 24px; margin: 28px 0 16px 0;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .section-header.sec-a { background: linear-gradient(90deg, #1e3a5f, #2d6a9f); color: white; }
+  .section-header.sec-b { background: linear-gradient(90deg, #1a5c3a, #22a067); color: white; }
+  .section-header.sec-c { background: linear-gradient(90deg, #6b21a8, #9333ea); color: white; }
+  .section-label { font-size: 22px; font-weight: 800; width: 40px; }
+  .section-info h2 { font-size: 17px; font-weight: 700; }
+  .section-info p { font-size: 13px; opacity: 0.85; margin-top: 3px; }
+  .section-score { margin-left: auto; text-align: right; }
+  .section-score .score-big { font-size: 28px; font-weight: 800; }
+  .section-score .score-label { font-size: 12px; opacity: 0.8; }
+
+  /* 평가 항목 카드 */
+  .item-card {
+    background: white; border-radius: 10px; margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.07); overflow: hidden;
+  }
+  .item-header {
+    padding: 14px 20px; display: flex; align-items: center; gap: 14px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .item-header.color-a { background: #eff6ff; border-left: 5px solid #2563eb; }
+  .item-header.color-b { background: #f0fdf4; border-left: 5px solid #16a34a; }
+  .item-header.color-c { background: #faf5ff; border-left: 5px solid #9333ea; }
+  .item-code { font-size: 18px; font-weight: 800; width: 36px; }
+  .item-code.color-a { color: #2563eb; }
+  .item-code.color-b { color: #16a34a; }
+  .item-code.color-c { color: #9333ea; }
+  .item-title-box h3 { font-size: 15px; font-weight: 700; color: #1a202c; }
+  .item-title-box p { font-size: 12px; color: #64748b; margin-top: 3px; }
+  .item-score-box { margin-left: auto; text-align: center; }
+  .score-circle {
+    width: 54px; height: 54px; border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .score-circle.color-a { background: #dbeafe; color: #1d4ed8; }
+  .score-circle.color-b { background: #dcfce7; color: #15803d; }
+  .score-circle.color-c { background: #f3e8ff; color: #7e22ce; }
+  .score-circle .sc-num { font-size: 17px; font-weight: 800; line-height: 1; }
+  .score-circle .sc-txt { font-size: 10px; }
+  .pass-threshold { font-size: 11px; color: #ef4444; font-weight: 600; margin-top: 4px; text-align: center; }
+
+  /* BARS 테이블 */
+  .bars-table { width: 100%; border-collapse: collapse; }
+  .bars-table th { background: #f8fafc; padding: 10px 14px; font-size: 12px; color: #475569; font-weight: 600; text-align: left; border-bottom: 2px solid #e2e8f0; }
+  .bars-table td { padding: 12px 14px; vertical-align: top; border-bottom: 1px solid #f1f5f9; font-size: 13px; line-height: 1.6; }
+  .bars-table tr:last-child td { border-bottom: none; }
+
+  .level-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    font-size: 11px; font-weight: 700; white-space: nowrap;
+  }
+  .level-excellent { background: #fef3c7; color: #b45309; }
+  .level-good { background: #dcfce7; color: #15803d; }
+  .level-poor { background: #fee2e2; color: #b91c1c; }
+  .level-fail { background: #fce7f3; color: #9d174d; }
+
+  .score-range { font-weight: 700; color: #374151; font-size: 13px; display: block; margin-top: 4px; }
+
+  /* 평가자 참조 메모 */
+  .ref-memo {
+    padding: 16px 20px;
+    background: #fffbeb;
+    border-top: 2px dashed #fbbf24;
+  }
+  .ref-memo h4 { font-size: 13px; font-weight: 700; color: #92400e; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .ref-memo h4::before { content: "📋"; }
+  .question-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .q-block { background: white; border-radius: 6px; padding: 10px 12px; border-left: 3px solid #fbbf24; }
+  .q-evaluator { font-size: 11px; font-weight: 700; color: #b45309; margin-bottom: 4px; }
+  .q-text { font-size: 12px; color: #374151; line-height: 1.5; font-style: italic; }
+  .q-point { font-size: 11px; color: #6b7280; margin-top: 4px; }
+
+  /* 가점 섹션 */
+  .bonus-section {
+    background: white; border-radius: 10px; padding: 20px 24px;
+    border-left: 5px solid #f59e0b; margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .bonus-section h3 { color: #b45309; font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+  .bonus-section p { font-size: 13px; color: #374151; line-height: 1.7; }
+
+  /* 최종 합산 */
+  .total-box {
+    background: linear-gradient(135deg, #1e3a5f, #2d6a9f); color: white;
+    border-radius: 12px; padding: 24px 32px; text-align: center;
+    margin-bottom: 28px;
+  }
+  .total-box h3 { font-size: 14px; opacity: 0.8; margin-bottom: 8px; }
+  .total-formula { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+  .total-pass { font-size: 22px; font-weight: 800; color: #fbbf24; }
+
+  @media print {
+    body { background: white; }
+    .container { padding: 10px; }
+    .item-card { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>🏆 2026년 기업의별 치프인증 BARS 평가표</h1>
+  <p>행동 기반 평가 기준 (BARS) · 평가위원 참조 질문 통합 버전</p>
+  <div class="badge-row">
+    <span class="badge">평가일: 2026년 3월 28일(토)</span>
+    <span class="badge">총점: 100점 + 가점 10점</span>
+    <span class="badge">합격기준: 평균 70점 이상</span>
+    <span class="badge">제작: 기업의별 평가위원회</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- 합격기준 안내표 -->
+  <div class="pass-guide">
+    <h3>🎯 배점별 합격 기준선 (70% 원칙)</h3>
+    <table class="pass-table">
+      <thead>
+        <tr>
+          <th>항목</th><th>만점</th><th>합격 기준선 (70%)</th><th>비고</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>A1. 세무사 응대 및 관계 구축</td><td>20점</td><td class="pass">14점 이상</td><td>인터뷰</td></tr>
+        <tr><td>A2. 프로젝트 협의 커뮤니케이션</td><td>20점</td><td class="pass">14점 이상</td><td>인터뷰</td></tr>
+        <tr><td>A3. 치프-세무사-고객 간 조율</td><td>10점</td><td class="pass">7점 이상</td><td>인터뷰</td></tr>
+        <tr><td>B1. 고객 문제 진단 및 설명</td><td>10점</td><td class="pass">7점 이상</td><td>PT</td></tr>
+        <tr><td>B2. 솔루션 제안 전달력·설득력</td><td>10점</td><td class="pass">7점 이상</td><td>PT</td></tr>
+        <tr><td>B3. 금융/법률 연계 방안 제시</td><td>10점</td><td class="pass">7점 이상</td><td>PT</td></tr>
+        <tr><td>C1. 프로젝트 솔루션 설계 능력</td><td>10점</td><td class="pass">7점 이상</td><td>PT</td></tr>
+        <tr><td>C2. 세무·금융·법률 지식 기반</td><td>5점</td><td class="pass">3.5점 이상</td><td>PT</td></tr>
+        <tr><td>C3. 리스크 관리 및 사후관리</td><td>5점</td><td class="pass">3.5점 이상</td><td>PT</td></tr>
+        <tr style="background:#fffbeb"><td>가점 (치프 역량 강화 교육)</td><td>10점</td><td>—</td><td>교육 이수 확인</td></tr>
+        <tr style="background:#f0fdf4; font-weight:700"><td>🏆 최종 합계</td><td>110점</td><td class="pass">평균 70점 이상</td><td>소속 평가위원 제외 평균</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===== SECTION A ===== -->
+  <div class="section-header sec-a">
+    <div class="section-label">A</div>
+    <div class="section-info">
+      <h2>세무사 협력 커뮤니케이션 역량</h2>
+      <p>평가 방식: 인터뷰 (1:1 롤플레이) | 고객 역할극 상황 대응</p>
+    </div>
+    <div class="section-score">
+      <div class="score-big">50점</div>
+      <div class="score-label">합격기준 35점</div>
+    </div>
+  </div>
+
+  <!-- A1 -->
+  <div class="item-card">
+    <div class="item-header color-a">
+      <div class="item-code color-a">A1</div>
+      <div class="item-title-box">
+        <h3>세무사 응대 및 관계 구축 능력</h3>
+        <p>세무사와의 초기 접점 형성, 신뢰 구축, 전문성 인지 등</p>
+      </div>
+      <div class="item-score-box">
+        <div class="score-circle color-a"><span class="sc-num">20</span><span class="sc-txt">점</span></div>
+        <div class="pass-threshold">합격기준 14점</div>
+      </div>
+    </div>
+    <table class="bars-table">
+      <thead><tr><th style="width:160px">수준</th><th>행동 기준 (BARS)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <span class="level-badge level-excellent">우수</span>
+            <span class="score-range">18~20점</span>
+          </td>
+          <td>세무사 소개 상황에서 <strong>소속·역할·협업 방식을 명확하고 자신감 있게 즉시 설명</strong>하며, 기장세무사와의 역할 분리를 전문적으로 정리한다. "여기도 보험사 아니냐", "소속이 어디냐" 등 신원 의심 질문에 당황하지 않고 신뢰를 주는 언어로 응대한다. 세무사가 소개해 준 배경을 존중하며 감사를 표현하고, 세무사-치프-고객의 3자 협업 구조를 고객이 이해하기 쉽게 설명한다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-good">양호 ✅합격</span>
+            <span class="score-range">14~17점</span>
+          </td>
+          <td>신원 질문에 적절히 응대하며 소속과 역할을 설명한다. 세무사 소개 경위를 언급하며 신뢰 관계를 형성하려는 노력이 보인다. 기장세무사 병행 상황에 대해 역할 충돌 없이 설명할 수 있으나, 표현이 다소 딱딱하거나 구체적이지 않을 수 있다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-poor">미흡 ⚠️</span>
+            <span class="score-range">10~13점</span>
+          </td>
+          <td>기본 응대는 가능하나 "세무사님과 어떻게 일하는지 모르겠다", "소개해 준 세무사님과 어떤 관계냐" 등 질문에 모호하게 답변하거나 역할이 불명확하다. 신뢰 구축보다 자기 설명에 집중하는 경향이 있으며, 고객이 혼란스러워할 수 있다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-fail">불합격 ❌</span>
+            <span class="score-range">0~9점</span>
+          </td>
+          <td>신원·소속 질문에 당황하거나 설명이 불충분해 고객의 불신을 해소하지 못한다. 세무사와의 협업 구조를 설명하지 못하거나 잘못 설명하여 오해를 야기한다. 기장세무사 병행 상황에서 역할 충돌을 인지하지 못한다.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="ref-memo">
+      <h4>평가자 참조 메모 — 롤플레이 체크 질문 (인터뷰 상황)</h4>
+      <div class="question-grid">
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"위원님은 여기 소속이세요? 다른 쪽에서 일하세요?"</div>
+          <div class="q-point">▶ 소속·역할 설명 명확성 확인</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"여기도 보험사 아니냐?"</div>
+          <div class="q-point">▶ 보험사 오해 해소 및 전문성 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"소개해 주신 세무사님한테는 기장 안맡기고 있는데, 기장은 다른 세무사님이 해주고 계세요."</div>
+          <div class="q-point">▶ 기장세무사 병행 구도 역할 분리 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"세무사님과 같이 컨설팅 하는 거냐?"</div>
+          <div class="q-point">▶ 세무사-치프 협업 구조 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"이런 거 하면 소개해 주신 세무사님한테도 뭐 가요?"</div>
+          <div class="q-point">▶ 세무사 이해관계(소개비 등) 투명하게 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"기장 세무사에게 소개비 주는 거냐?"</div>
+          <div class="q-point">▶ 세무사 소개 구조 솔직·명확 설명</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- A2 -->
+  <div class="item-card">
+    <div class="item-header color-a">
+      <div class="item-code color-a">A2</div>
+      <div class="item-title-box">
+        <h3>프로젝트 협의 커뮤니케이션 스킬</h3>
+        <p>프로젝트 범위·일정·역할 협의 시 커뮤니케이션 역량</p>
+      </div>
+      <div class="item-score-box">
+        <div class="score-circle color-a"><span class="sc-num">20</span><span class="sc-txt">점</span></div>
+        <div class="pass-threshold">합격기준 14점</div>
+      </div>
+    </div>
+    <table class="bars-table">
+      <thead><tr><th style="width:160px">수준</th><th>행동 기준 (BARS)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <span class="level-badge level-excellent">우수</span>
+            <span class="score-range">18~20점</span>
+          </td>
+          <td>비용·기간·수수료에 대한 고객의 저항을 <strong>공감 → 근거 제시 → 대안 제안</strong> 3단계로 능숙하게 처리한다. "지금 바로 알려달라"는 즉석 압박에도 "진단 전 단가 제시가 어려운 이유"를 논리적으로 설명하며 신뢰를 유지한다. 경쟁사 가격 비교, 컨설팅 기간 단축 요구에 대해 구체적 수치와 사례로 가치를 설득한다. "솔루션을 직원한테 설명해 달라"는 요청에 대한 적절한 대응 방안을 제시한다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-good">양호 ✅합격</span>
+            <span class="score-range">14~17점</span>
+          </td>
+          <td>비용·기간 이의에 대해 합리적으로 설명하며 대부분의 협의 상황을 원만하게 처리한다. 즉석 수수료 문의에 "전체 진단 후 제안드리겠다"는 방향을 제시한다. 자료 요청·브리핑 요청에 적절히 응대하나 설득력이 다소 부족할 수 있다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-poor">미흡 ⚠️</span>
+            <span class="score-range">10~13점</span>
+          </td>
+          <td>비용이나 기간 관련 이의 제기에 방어적으로 반응하거나 단순 설명에 그친다. 고객의 "자료 먼저 주세요" 요청에 무분별하게 동의하거나 거절 이유를 설명하지 못한다. 경쟁사 가격 비교 상황에서 차별점을 명확히 제시하지 못한다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-fail">불합격 ❌</span>
+            <span class="score-range">0~9점</span>
+          </td>
+          <td>비용·기간 이의에 즉시 양보하거나 무기력하게 대응한다. 고객의 즉석 정보 요구에 체계 없이 모든 정보를 제공하거나 아무것도 설명하지 못한다. 협의 상황에서 진행 방향을 잡지 못하고 표류한다.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="ref-memo">
+      <h4>평가자 참조 메모 — 롤플레이 체크 질문 (인터뷰·결과보기)</h4>
+      <div class="question-grid">
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"얼마인지 먼저 알고 싶은데요, 자문료하고 비용."</div>
+          <div class="q-point">▶ 진단 전 단가 공개 불가 이유 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"오늘 만난 김에 대략 설명해 주시면 안 되요?"</div>
+          <div class="q-point">▶ 즉석 솔루션 요구 대응 (프로세스 안내)</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"다른 데서는 말씀하신 거 절반 가격으로도 해주신다고 하던데."</div>
+          <div class="q-point">▶ 경쟁사 가격 비교 대응 및 차별점 설득</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"솔루션은 우리 직원을 보낼 테니 설명해 달라."</div>
+          <div class="q-point">▶ 의사결정권자 직접 참여 필요성 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"너무 컨설팅 기간이 긴데 좀 줄여 달라."</div>
+          <div class="q-point">▶ 기간 근거 설명 및 단계별 조율 방안</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"천천히 생각해보고 결정하겠다 브리핑 자료 보내 달라."</div>
+          <div class="q-point">▶ 결정 보류 상황의 관계 유지 전략</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"실행기간이 너무 긴데요, 업무종료가 그렇게 긴 건 처음 봐요."</div>
+          <div class="q-point">▶ 장기 프로젝트 필요성 근거 제시</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"일단 자료 좀 주세요. 다음에 오기 전에 제안자료 먼저 받고 싶은데요."</div>
+          <div class="q-point">▶ 사전 자료 요청 대응 전략</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- A3 -->
+  <div class="item-card">
+    <div class="item-header color-a">
+      <div class="item-code color-a">A3</div>
+      <div class="item-title-box">
+        <h3>치프-세무사-고객 간 인터페이스 조율 역량</h3>
+        <p>삼자 간 이해관계 조율 및 정보 중개 역량</p>
+      </div>
+      <div class="item-score-box">
+        <div class="score-circle color-a"><span class="sc-num">10</span><span class="sc-txt">점</span></div>
+        <div class="pass-threshold">합격기준 7점</div>
+      </div>
+    </div>
+    <table class="bars-table">
+      <thead><tr><th style="width:160px">수준</th><th>행동 기준 (BARS)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <span class="level-badge level-excellent">우수</span>
+            <span class="score-range">9~10점</span>
+          </td>
+          <td>세무사-치프-고객 3자 간 역할을 명확히 구분하고, 고객이 "세무사에게 설명해 달라"고 요청할 때 <strong>적절한 방향(치프 주도 vs. 세무사 협조)</strong>을 제안할 수 있다. 의사결정권자가 아닌 직원이 참여하려는 상황에서 대표 직접 면담의 필요성을 설득력 있게 안내한다. 세무사와 치프 간 정보 흐름을 고객이 이해할 수 있도록 중개한다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-good">양호 ✅합격</span>
+            <span class="score-range">7~8점</span>
+          </td>
+          <td>3자 역할 구분이 가능하며, 고객의 "세무사에게 설명해 달라" 요청에 적절히 대응한다. 직원 대리 설명 요청에 무조건 거절하거나 무조건 수용하지 않고, 상황에 맞는 답변을 한다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-poor">미흡 ⚠️</span>
+            <span class="score-range">5~6점</span>
+          </td>
+          <td>세무사와 치프의 역할 경계가 불명확하거나, "기장세무사에게 설명해 달라"는 요청에 어떻게 처리할지 모른다. 삼자 간 정보 흐름 조율을 시도하지 않는다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-fail">불합격 ❌</span>
+            <span class="score-range">0~4점</span>
+          </td>
+          <td>3자 관계를 제대로 이해하지 못하고, 고객의 요청에 혼란스럽게 응답한다. 세무사를 통한 우회 설명 요청에 역할 혼란을 노출한다.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="ref-memo">
+      <h4>평가자 참조 메모</h4>
+      <div class="question-grid">
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"기장세무사한테 설명해 달라, 기장세무사한테 설명 듣겠다."</div>
+          <div class="q-point">▶ 세무사 경유 요청 대응 — 치프 주도권 유지</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"솔루션은 우리 직원을 보낼 테니 설명해 달라."</div>
+          <div class="q-point">▶ 대표 직접 참여 필요성 설득</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"세무사 사무실에서 어떻게 일하는지 도통 모르겠다."</div>
+          <div class="q-point">▶ 세무사-치프 협업 구조 쉽게 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"이런 거 하면 소개해 주신 세무사님한테도 뭐 가요?"</div>
+          <div class="q-point">▶ 세무사 이해관계 투명하게 조율</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ===== SECTION B ===== -->
+  <div class="section-header sec-b">
+    <div class="section-label">B</div>
+    <div class="section-info">
+      <h2>고객 솔루션 제안 커뮤니케이션 역량</h2>
+      <p>평가 방식: PT (프레젠테이션) | 결과보기 상황 롤플레이</p>
+    </div>
+    <div class="section-score">
+      <div class="score-big">30점</div>
+      <div class="score-label">합격기준 21점</div>
+    </div>
+  </div>
+
+  <!-- B1 -->
+  <div class="item-card">
+    <div class="item-header color-b">
+      <div class="item-code color-b">B1</div>
+      <div class="item-title-box">
+        <h3>고객 문제 진단 및 설명 능력</h3>
+        <p>고객의 핵심 이슈를 구조화하여 설명하는 능력</p>
+      </div>
+      <div class="item-score-box">
+        <div class="score-circle color-b"><span class="sc-num">10</span><span class="sc-txt">점</span></div>
+        <div class="pass-threshold">합격기준 7점</div>
+      </div>
+    </div>
+    <table class="bars-table">
+      <thead><tr><th style="width:160px">수준</th><th>행동 기준 (BARS)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <span class="level-badge level-excellent">우수</span>
+            <span class="score-range">9~10점</span>
+          </td>
+          <td>"가지급금이 왜 문제가 돼요? 그냥 놔둬도 되는 거 아니에요?"라는 질문에 <strong>인정이자 부과, 상여처분, 외감 리스크 등 수치로 가시화</strong>하며 설득력 있게 설명한다. 고객이 문제를 인식하지 못하는 상황(가지급금 발생 경위를 몰랐다)에서도 기장세무사가 인지하지 못한 리스크를 구조화하여 설명한다. 3가지 핵심 이슈(가지급금·차명주식·승계)를 연결하여 복합적 위험을 명확히 전달한다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-good">양호 ✅합격</span>
+            <span class="score-range">7~8점</span>
+          </td>
+          <td>핵심 문제를 구조화하여 설명하며, 고객이 문제를 인식하지 못하는 상황에 적절히 대응한다. 가지급금·차명주식 등 주요 이슈의 위험을 설명하나 수치적 근거가 다소 부족할 수 있다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-poor">미흡 ⚠️</span>
+            <span class="score-range">5~6점</span>
+          </td>
+          <td>문제 설명이 표면적이거나 추상적이어서 고객의 이해를 돕지 못한다. "그냥 놔둬도 되는 거 아니에요?"에 명확한 이유를 제시하지 못한다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-fail">불합격 ❌</span>
+            <span class="score-range">0~4점</span>
+          </td>
+          <td>고객의 문제 인식 부재 상황에서 설득력 있는 설명을 하지 못하고, 문제 구조화 능력이 현저히 부족하다.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="ref-memo">
+      <h4>평가자 참조 메모 — 결과보기 상황 체크 질문</h4>
+      <div class="question-grid">
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"가지급금이 왜 문제가 되는 거에요? 그냥 놔둬도 되는 거 아니에요?"</div>
+          <div class="q-point">▶ 가지급금 리스크 수치 가시화 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"이렇게 가지급금이 생겼는지 몰랐다, 기장세무사가 시키는 대로만 했는데."</div>
+          <div class="q-point">▶ 기존 세무사 맹점 지적 및 문제 인식 유도</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"우리 회사는 작아요, 이런 거 할 만큼 여유도 있지 않고."</div>
+          <div class="q-point">▶ 소규모 회사 적합성 및 비용 대비 효과 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"글쎄요, 애들한테 주는 게 맞나 모르겠네요. 아직 결정 안 됐어요."</div>
+          <div class="q-point">▶ 결정 보류 상황에서 문제 긴박성 인식 유도</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B2 -->
+  <div class="item-card">
+    <div class="item-header color-b">
+      <div class="item-code color-b">B2</div>
+      <div class="item-title-box">
+        <h3>솔루션 제안 전달력 및 설득력</h3>
+        <p>솔루션을 명확하고 설득력 있게 전달하는 역량</p>
+      </div>
+      <div class="item-score-box">
+        <div class="score-circle color-b"><span class="sc-num">10</span><span class="sc-txt">점</span></div>
+        <div class="pass-threshold">합격기준 7점</div>
+      </div>
+    </div>
+    <table class="bars-table">
+      <thead><tr><th style="width:160px">수준</th><th>행동 기준 (BARS)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <span class="level-badge level-excellent">우수</span>
+            <span class="score-range">9~10점</span>
+          </td>
+          <td>"꼭 보험으로 해야 하는 이유가 뭐에요?", "보험은 길어서 싫다 현금으로만 하고 싶다"는 저항에 <strong>보험 방식의 세무적 근거와 현금 방식의 리스크를 비교</strong>하여 설득한다. "납부할 자금 흐름이 안 된다"는 반론에 단계적 실행, 소규모 선착수 방안 등 구체적 대안을 제시한다. "이미 보험이 많다"는 상황에서 기존 보험과의 차별점을 명확히 설명한다. 솔루션의 핵심 가치를 3가지 이내로 명확히 요약하여 전달한다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-good">양호 ✅합격</span>
+            <span class="score-range">7~8점</span>
+          </td>
+          <td>솔루션 방향을 명확히 전달하며 주요 반론에 합리적으로 응대한다. 보험 방식 외 대안을 언급하거나, 단계적 접근을 제안할 수 있다. 자금 문제에 대한 유연한 방안을 제시하나 설득력이 다소 약할 수 있다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-poor">미흡 ⚠️</span>
+            <span class="score-range">5~6점</span>
+          </td>
+          <td>솔루션 전달은 가능하나 보험 방식에 대한 저항, 자금 부족 반론 등 핵심 이의에 설득력 있는 응대를 하지 못한다. 대안 제시 없이 원안만 주장한다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-fail">불합격 ❌</span>
+            <span class="score-range">0~4점</span>
+          </td>
+          <td>솔루션 전달이 산만하거나 핵심을 요약하지 못한다. 반론에 설득력 있게 응대하지 못하고, 고객의 대안 요구에 답하지 못한다.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="ref-memo">
+      <h4>평가자 참조 메모 — 결과보기 핵심 저항 질문</h4>
+      <div class="question-grid">
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"이거 꼭 보험으로 해야 하는 이유가 뭐에요?"</div>
+          <div class="q-point">▶ 보험 방식 세무적 우위 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"보험은 길어서 싫다, 현금으로만 하고 싶다."</div>
+          <div class="q-point">▶ 현금 방식 vs. 보험 방식 비교 설득</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"저희 회사는 이거 납부할 자금 흐름이 안 돼요."</div>
+          <div class="q-point">▶ 단계적 실행 대안 제시</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"매월 보험료가 너무 부담된다, 일단 작게 시작하고 나중에 잘되면 더 가입하겠다."</div>
+          <div class="q-point">▶ 소액 착수 전략 및 효과 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"이미 보험 가입이 많이 되어 있어요."</div>
+          <div class="q-point">▶ 기존 보험 차별성 및 추가 필요성 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"현금 수수료도 매월 분할로 내면 안 되냐?"</div>
+          <div class="q-point">▶ 분할 납부 가능 여부 및 조건 설명</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B3 -->
+  <div class="item-card">
+    <div class="item-header color-b">
+      <div class="item-code color-b">B3</div>
+      <div class="item-title-box">
+        <h3>금융/법률 연계 방안 제시 능력</h3>
+        <p>세무 외 금융·법률 등 연계 솔루션 제안 역량</p>
+      </div>
+      <div class="item-score-box">
+        <div class="score-circle color-b"><span class="sc-num">10</span><span class="sc-txt">점</span></div>
+        <div class="pass-threshold">합격기준 7점</div>
+      </div>
+    </div>
+    <table class="bars-table">
+      <thead><tr><th style="width:160px">수준</th><th>행동 기준 (BARS)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <span class="level-badge level-excellent">우수</span>
+            <span class="score-range">9~10점</span>
+          </td>
+          <td>"팀에 변호사까지 필요 없다, 너무 비쌀 것 같다"는 비용 이의에 <strong>법률 전문가 참여의 필수성(차명주식 소송 리스크, 계약서 검토 등)을 구체적 사례로 설득</strong>한다. "세무조사 나오면 치프님이 책임지시는 건가요?"에 대해 책임 범위를 명확히 정의하며 보험·계약서를 통한 리스크 헤지 방안을 제시한다. 보험·법률·세무를 연계한 통합 솔루션의 시너지를 명확히 설명한다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-good">양호 ✅합격</span>
+            <span class="score-range">7~8점</span>
+          </td>
+          <td>금융·법률 연계 필요성을 설명하며 팀 구성의 이유를 납득시킬 수 있다. 세무조사 책임 소재에 대해 적절한 수준의 답변을 한다. 보험 방식의 세무적 근거를 제시하나 연계 구조 설명이 다소 부족하다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-poor">미흡 ⚠️</span>
+            <span class="score-range">5~6점</span>
+          </td>
+          <td>법률 팀 필요성 설명이 부족하고, "비싸다"는 이의에 설득력 있는 답변을 하지 못한다. 책임 소재 질문에 모호한 답변을 한다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-fail">불합격 ❌</span>
+            <span class="score-range">0~4점</span>
+          </td>
+          <td>금융·법률 연계 방안을 제시하지 못하거나, 비용 이의에 즉시 팀 구성을 축소하겠다고 양보한다. 세무조사 책임 관련 질문에 부적절하게 답변하여 신뢰를 잃는다.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="ref-memo">
+      <h4>평가자 참조 메모</h4>
+      <div class="question-grid">
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"팀에 변호사까지 필요 없다, 너무 비쌀 것 같다."</div>
+          <div class="q-point">▶ 법률 전문가 역할 필요성 구체적 설득</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"세무조사 나오면 치프님이 책임지시는 건가요? 세금 부과되면 어떻게 되는 거죠?"</div>
+          <div class="q-point">▶ 책임 범위 명확화 및 리스크 헤지 방안 제시</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"실행 후 과세되면 책임지냐?"</div>
+          <div class="q-point">▶ 과세 시 대응 체계 및 계약서 명시 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"위원님이 일 그만두시면 혹시 나머지는 누가 진행하시는 거에요?"</div>
+          <div class="q-point">▶ 프로젝트 지속성 및 팀 백업 체계 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"컨설팅 계약서는 쓰는 거죠?"</div>
+          <div class="q-point">▶ 계약서 체결 방식 및 조건 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"실행이 제대로 안 되면 어떡하냐?"</div>
+          <div class="q-point">▶ 실행 보증 체계 및 계약서 명시 사항 설명</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ===== SECTION C ===== -->
+  <div class="section-header sec-c">
+    <div class="section-label">C</div>
+    <div class="section-info">
+      <h2>프로젝트 설계 및 실무 역량</h2>
+      <p>평가 방식: PT (프레젠테이션) | 주어진 사례 기반 솔루션 설계</p>
+    </div>
+    <div class="section-score">
+      <div class="score-big">20점</div>
+      <div class="score-label">합격기준 14점</div>
+    </div>
+  </div>
+
+  <!-- C1 -->
+  <div class="item-card">
+    <div class="item-header color-c">
+      <div class="item-code color-c">C1</div>
+      <div class="item-title-box">
+        <h3>프로젝트 솔루션 설계 능력</h3>
+        <p>평가 사례에 대한 구조화된 솔루션 설계 및 제안 역량</p>
+      </div>
+      <div class="item-score-box">
+        <div class="score-circle color-c"><span class="sc-num">10</span><span class="sc-txt">점</span></div>
+        <div class="pass-threshold">합격기준 7점</div>
+      </div>
+    </div>
+    <table class="bars-table">
+      <thead><tr><th style="width:160px">수준</th><th>행동 기준 (BARS)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <span class="level-badge level-excellent">우수</span>
+            <span class="score-range">9~10점</span>
+          </td>
+          <td>가업승계·차명주식·가지급금 3개 사례에 대해 <strong>문제 진단 → 대안 비교 → 최적 솔루션 선택 → 실행 로드맵</strong> 4단계 구조로 완성도 높은 솔루션을 설계한다. 정량적 비교 분석(증여세 시뮬레이션, 인정이자 5년 추정 등)을 포함하며, 실행 우선순위와 단계별 일정이 명확하다. 고객 맞춤형 접근(회사 규모·재무 상태 반영)이 돋보인다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-good">양호 ✅합격</span>
+            <span class="score-range">7~8점</span>
+          </td>
+          <td>3개 사례 중 2개 이상의 솔루션을 합리적으로 설계하며, 대안 비교와 실행 방향을 제시한다. 정량적 근거가 일부 부족하나 구조화된 접근 방식이 확인된다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-poor">미흡 ⚠️</span>
+            <span class="score-range">5~6점</span>
+          </td>
+          <td>솔루션 설계가 표면적이거나 방향 제시에 그치며, 대안 비교 없이 단일 방안만 제시한다. 실행 로드맵이 불명확하다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-fail">불합격 ❌</span>
+            <span class="score-range">0~4점</span>
+          </td>
+          <td>사례 분석이 미흡하고, 구체적인 솔루션을 설계하지 못한다. 평가 문항의 RFN(요구사항)에 제대로 응답하지 못한다.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="ref-memo">
+      <h4>평가자 참조 — TEST RED 3개 사례 RFN 핵심 포인트</h4>
+      <div class="question-grid">
+        <div class="q-block">
+          <div class="q-evaluator">문항 1 · 주식이동/승계 (Cloud A사)</div>
+          <div class="q-text">현재 증여 vs. 1년 후 가치 상승 시 증여세 시뮬레이션 비교 제시</div>
+          <div class="q-point">▶ 가업승계 증여세 과세특례 활용 전략 설계</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">문항 2 · 차명주식 회수 (화학 D사)</div>
+          <div class="q-text">T1(위독)·T2(치매)·T3 각각 맞춤 회수 전략 + 6개월 로드맵</div>
+          <div class="q-point">▶ 수탁자 상태별 차별화 대응 전략 제시</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">문항 3 · 가지급금 해소 (건재 M사)</div>
+          <div class="q-text">특허권 양도, 이익소각, 인정이자 5년 손실 추정 시나리오</div>
+          <div class="q-point">▶ 복합 방식 가지급금 해소 실행 계획 수립</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">공통 평가 포인트</div>
+          <div class="q-text">솔루션 자료·견적서 요청, "오늘 대략이라도 솔루션을 알려달라"는 압박 대응</div>
+          <div class="q-point">▶ 진단 전 솔루션 공개 불가 원칙 유지</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C2 -->
+  <div class="item-card">
+    <div class="item-header color-c">
+      <div class="item-code color-c">C2</div>
+      <div class="item-title-box">
+        <h3>세무·금융·법률 지식 기반</h3>
+        <p>관련 제도, 법령, 금융 상품 활용 능력</p>
+      </div>
+      <div class="item-score-box">
+        <div class="score-circle color-c"><span class="sc-num">5</span><span class="sc-txt">점</span></div>
+        <div class="pass-threshold">합격기준 3.5점</div>
+      </div>
+    </div>
+    <table class="bars-table">
+      <thead><tr><th style="width:160px">수준</th><th>행동 기준 (BARS)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <span class="level-badge level-excellent">우수</span>
+            <span class="score-range">5점</span>
+          </td>
+          <td>가업승계 증여세 과세특례, 명의신탁주식 실제소유자 확인제도, 의제배당 최소화 이익소각 등 <strong>핵심 제도를 정확히 인용</strong>하며 적용 요건을 설명한다. 금융상품(보험 활용 세무 처리)과 법률(상법 절차)을 연계한 통합 지식을 보여준다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-good">양호 ✅합격</span>
+            <span class="score-range">3.5~4점</span>
+          </td>
+          <td>주요 제도를 적절히 인용하며 솔루션 근거로 활용한다. 세무·법률 관련 설명이 대체로 정확하나 일부 세부 요건에서 불완전한 부분이 있다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-poor">미흡 ⚠️</span>
+            <span class="score-range">2~3점</span>
+          </td>
+          <td>기본 개념은 알고 있으나 구체적 적용 요건이나 제도 활용 방법 설명이 부족하다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-fail">불합격 ❌</span>
+            <span class="score-range">0~1점</span>
+          </td>
+          <td>핵심 세무·법률 제도를 잘못 인용하거나 모르는 경우가 많다.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- C3 -->
+  <div class="item-card">
+    <div class="item-header color-c">
+      <div class="item-code color-c">C3</div>
+      <div class="item-title-box">
+        <h3>리스크 관리 및 사후관리 역량</h3>
+        <p>리스크 식별, 사후 관리 체계, 재발 방지 로드맵 수립 능력</p>
+      </div>
+      <div class="item-score-box">
+        <div class="score-circle color-c"><span class="sc-num">5</span><span class="sc-txt">점</span></div>
+        <div class="pass-threshold">합격기준 3.5점</div>
+      </div>
+    </div>
+    <table class="bars-table">
+      <thead><tr><th style="width:160px">수준</th><th>행동 기준 (BARS)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>
+            <span class="level-badge level-excellent">우수</span>
+            <span class="score-range">5점</span>
+          </td>
+          <td>증여 후 5년간 고용·업종·지분 유지 요건 위반 방지 로드맵, 가지급금 재발 방지를 위한 임원 보수 규정 개선안 등 <strong>구체적 사후관리 체계를 제시</strong>한다. 세무조사 대비 증빙 체계, 차명주식 회수 후 지배구조 안정화 방안까지 포함한다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-good">양호 ✅합격</span>
+            <span class="score-range">3.5~4점</span>
+          </td>
+          <td>사후관리의 필요성을 인식하고 주요 리스크 항목을 제시한다. 구체적 체계나 로드맵은 다소 부족하나 방향성이 명확하다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-poor">미흡 ⚠️</span>
+            <span class="score-range">2~3점</span>
+          </td>
+          <td>솔루션 실행 후 사후관리를 언급하지 않거나 원론적 수준에 그친다.</td>
+        </tr>
+        <tr>
+          <td>
+            <span class="level-badge level-fail">불합격 ❌</span>
+            <span class="score-range">0~1점</span>
+          </td>
+          <td>리스크 관리 및 사후관리 개념이 없고, 실행 이후 발생 가능한 문제를 인식하지 못한다.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="ref-memo">
+      <h4>평가자 참조 — C2·C3 공통 체크 포인트</h4>
+      <div class="question-grid">
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"위원님은 세무사세요? 세무사도 아닌데 어떻게 책임지고 업무 진행해요?"</div>
+          <div class="q-point">▶ 치프의 전문성 근거 및 책임 범위 명확히 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">하상현 위원</div>
+          <div class="q-text">"실행 후 과세되면 책임지냐?"</div>
+          <div class="q-point">▶ 과세 발생 시 사후 대응 체계 제시</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"차명주주도 만나서 설득해 주시는 거에요?"</div>
+          <div class="q-point">▶ 수탁자 설득 프로세스 및 지원 범위 설명</div>
+        </div>
+        <div class="q-block">
+          <div class="q-evaluator">김홍 위원</div>
+          <div class="q-text">"실비는 내주시는 거죠?"</div>
+          <div class="q-point">▶ 비용 구조(수수료·실비) 명확히 설명</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 가점 -->
+  <div class="bonus-section">
+    <h3>🎁 가점 항목 — 치프 역량 강화 교육 이수 (최대 10점)</h3>
+    <p>평가일 기준 치프 역량 강화 교육 이수 여부에 따라 가점을 부여합니다. 교육 이수 확인서 제출 필요. 가점 포함 최대 110점이나, <strong>합격 기준은 본 점수(100점 기준) 평균 70점 이상</strong>으로 소속 평가위원을 제외한 평가위원 평균으로 산정합니다.</p>
+  </div>
+
+  <!-- 최종 합산 -->
+  <div class="total-box">
+    <h3>최종 합산 기준</h3>
+    <div class="total-formula">A(50점) + B(30점) + C(20점) = 100점 + 가점(10점) = 최대 110점</div>
+    <div class="total-pass">✅ 합격 기준: 소속 평가위원 제외 평균 70점 이상</div>
+  </div>
+
+</div><!-- /container -->
+</body>
+</html>

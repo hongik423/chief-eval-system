@@ -53,6 +53,7 @@ import { useStore } from '@/lib/store';
 const ALL_EVALUATORS = ['나동환', '권영도', '권오경', '김홍', '박성현', '윤덕상', '하상현'];
 const CATEGORY_KEYS = Object.keys(QS_CATEGORIES);
 const RESET_KEYWORD = '초기화하라';
+const ASSIGN_RESET_KEYWORD = '배정초기화하라';
 
 // 관리자 계정
 const ADMINS = [
@@ -84,7 +85,7 @@ export default function QSResultsPage() {
   const [adminName, setAdminName] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [adminError, setAdminError] = useState('');
-  const [adminMode, setAdminMode] = useState(false); // 관리자 인증 완료 여부
+  const [adminMode, setAdminMode] = useState(!!localStorage.getItem('chief_eval_admin')); // 메인 앱 관리자 또는 QS 관리자 인증
 
   // 편집 모드
   const [editMode, setEditMode] = useState(false);
@@ -109,6 +110,12 @@ export default function QSResultsPage() {
   const [resetTexts, setResetTexts] = useState(['', '', '']);
   const [resetError, setResetError] = useState('');
 
+  // ── 배정 초기화 확인 모달
+  const [showClearAssignConfirm, setShowClearAssignConfirm] = useState(false);
+  const [clearAssignPassword, setClearAssignPassword] = useState('');
+  const [clearAssignText, setClearAssignText] = useState('');
+  const [clearAssignError, setClearAssignError] = useState('');
+
   // ── 2차 출제 랜덤 배정
   const [assignments, setAssignments] = useState([]); // 현재 배정 목록
   const [assignSavedAt, setAssignSavedAt] = useState(null);
@@ -117,6 +124,7 @@ export default function QSResultsPage() {
   const [testAssignments, setTestAssignments] = useState([]); // 테스트 배정 결과
   const [isSpinning, setIsSpinning] = useState(false); // 랜덤 배정 애니메이션
   const [spinStep, setSpinStep] = useState(0); // 애니메이션 단계 (0~3)
+  const assignmentsResultRef = useRef(null); // 랜덤 배정 출제 확정 결과 섹션 스크롤용
 
   // ── 피평가자 단계 추적
   const [trackerSummary, setTrackerSummary] = useState([]);
@@ -137,6 +145,14 @@ export default function QSResultsPage() {
   const [supabaseProgress, setSupabaseProgress] = useState([]);
   const [showSupabasePanel, setShowSupabasePanel] = useState(false);
   const [loadingSupabase, setLoadingSupabase] = useState(false);
+
+  // 메인 앱 관리자: 로그인 없이 모든 영역 adminMode 부여
+  useEffect(() => {
+    if (localStorage.getItem('chief_eval_admin')) {
+      setAdminMode(true);
+      setAdminName('관리자');
+    }
+  }, []);
 
   // ── 5단계: 인증평가 실시
   const [showEvalPanel, setShowEvalPanel] = useState(false);
@@ -453,19 +469,51 @@ export default function QSResultsPage() {
     });
   };
 
-  // ── 테스트 시뮬레이션 실행 (저장하지 않음)
-  const handleTestAssignment = () => {
+  // ── 랜덤배정출제: 관리자=실제 확정 저장, 비관리자=미리보기(저장 안함)
+  const handleRandomAssignment = () => {
     runSpinAnimation(() => {
       const result = generateRandomAssignments(true);
-      setTestAssignments(result);
+      if (adminMode) {
+        saveAssignmentsLocal(result);
+        setAssignments(result);
+        setAssignSavedAt(new Date().toISOString());
+        setTestAssignments([]);
+      } else {
+        setTestAssignments(result);
+      }
     });
   };
 
-  // ── 2차 배정 초기화
-  const handleClearAssignment = () => {
+  // ── 2차 배정 초기화 (직접 호출, 모달 없음)
+  const doClearAssignment = () => {
     clearAssignmentsLocal();
     setAssignments([]);
     setAssignSavedAt(null);
+  };
+
+  // ── 배정 초기화 모달 닫기 및 입력값 초기화
+  const closeClearAssignModal = () => {
+    setShowClearAssignConfirm(false);
+    setClearAssignPassword('');
+    setClearAssignText('');
+    setClearAssignError('');
+  };
+
+  // ── 배정 초기화 실행 (관리자 비밀번호 + "배정초기화하라" 검증 후)
+  const handleClearAssignmentConfirm = () => {
+    setClearAssignError('');
+    const pwOk = ADMINS.some((a) => a.password === clearAssignPassword);
+    const textOk = clearAssignText === ASSIGN_RESET_KEYWORD;
+    if (!pwOk) {
+      setClearAssignError('관리자 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    if (!textOk) {
+      setClearAssignError(`"${ASSIGN_RESET_KEYWORD}"를 정확히 입력해 주세요.`);
+      return;
+    }
+    doClearAssignment();
+    closeClearAssignModal();
   };
 
   // ── 룰렛 분야 정의
@@ -1695,9 +1743,19 @@ export default function QSResultsPage() {
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-stone-700 font-medium">배정일</p>
-                <p className="text-sm font-black text-stone-900">{ROUND2_DATE_STR}</p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/question-selection/assignment-confirm')}
+                  className="px-4 py-2 rounded-xl text-sm font-black text-stone-900 transition hover:opacity-90 active:scale-95 border-2 border-stone-800/40 shadow-md"
+                  style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' }}
+                >
+                  📋 랜덤 배정 출제 확정
+                </button>
+                <div className="text-right">
+                  <p className="text-xs text-stone-700 font-medium">배정일</p>
+                  <p className="text-sm font-black text-stone-900">{ROUND2_DATE_STR}</p>
+                </div>
               </div>
             </div>
 
@@ -1733,7 +1791,7 @@ export default function QSResultsPage() {
             </div>
 
             {/* 배정 실행 / 결과 영역 */}
-            <div className="px-6 py-5">
+            <div ref={assignmentsResultRef} className="px-6 py-5">
 
               {/* ── 슬롯머신 애니메이션 ── */}
               {isSpinning && (
@@ -1775,37 +1833,25 @@ export default function QSResultsPage() {
               )}
 
               {/* ── 실행 버튼 영역 ── */}
-              <div className="flex items-center gap-3 mb-5 flex-wrap">
-                {/* 테스트 시뮬레이션 버튼 (항상 표시) */}
+              <div id="assignments-action-area" className="flex items-center gap-3 mb-5 flex-wrap">
+                {/* 랜덤배정출제: 관리자=실제 저장, 비관리자=미리보기 */}
                 <button
-                  onClick={handleTestAssignment}
+                  onClick={handleRandomAssignment}
                   disabled={isSpinning}
                   className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm transition hover:opacity-90 shadow-lg active:scale-95 border-2 disabled:opacity-50"
-                  style={{
-                    background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                    borderColor: '#d97706',
-                    color: '#fbbf24',
-                  }}
+                  style={
+                    adminMode
+                      ? { background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)', borderColor: 'rgb(163,120,55)', color: '#1a1207' }
+                      : { background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderColor: '#d97706', color: '#fbbf24' }
+                  }
                 >
-                  🧪 테스트 시뮬레이션
-                  {testAssignments.length > 0 ? ' (재실행)' : ''}
+                  🎲 랜덤배정출제
+                  {assignments.length > 0 || testAssignments.length > 0 ? ' (재실행)' : ''}
                 </button>
-
-                {/* 관리자 확정 배정 버튼 */}
-                {adminMode && (
-                  <button
-                    onClick={handleRunAssignment}
-                    disabled={isSpinning}
-                    className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm text-stone-900 transition hover:opacity-90 shadow-lg active:scale-95 disabled:opacity-50"
-                    style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
-                  >
-                    🎲 확정 배정 실행{assignments.length > 0 ? ' (재배정)' : ''}
-                  </button>
-                )}
 
                 {adminMode && assignments.length > 0 && (
                   <button
-                    onClick={handleClearAssignment}
+                    onClick={() => setShowClearAssignConfirm(true)}
                     className="px-4 py-3 rounded-xl text-xs font-bold text-red-400 border border-red-800/60 hover:bg-red-900/30 transition"
                   >
                     배정 초기화
@@ -1819,14 +1865,14 @@ export default function QSResultsPage() {
                 )}
               </div>
 
-              {/* ── 테스트 시뮬레이션 결과 ── */}
+              {/* ── 랜덤배정출제 결과 (미리보기, 비관리자) ── */}
               {testAssignments.length > 0 && (
                 <div className="mb-6">
                   <div className="rounded-2xl border-2 border-dashed border-amber-600/60 overflow-hidden" style={{ background: 'rgba(120,80,20,0.08)' }}>
                     <div className="px-5 py-3 border-b border-amber-800/30 flex items-center justify-between" style={{ background: 'rgba(217,119,6,0.1)' }}>
                       <div className="flex items-center gap-2">
-                        <span className="text-base">🧪</span>
-                        <p className="text-sm font-bold text-amber-400">테스트 시뮬레이션 결과</p>
+                        <span className="text-base">🎲</span>
+                        <p className="text-sm font-bold text-amber-400">랜덤배정출제 결과</p>
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-500 border border-amber-700/50 font-bold">미저장</span>
                       </div>
                       <button
@@ -1871,7 +1917,7 @@ export default function QSResultsPage() {
                         })}
                       </div>
                       <p className="text-[11px] text-slate-500 mt-3 text-center">
-                        ⚠️ 테스트 결과는 저장되지 않습니다. 확정하려면 관리자 모드에서 "확정 배정 실행"을 클릭하세요.
+                        ⚠️ 미리보기입니다. 저장하려면 관리자 모드로 로그인 후 "랜덤배정출제"를 클릭하세요.
                       </p>
                     </div>
                   </div>
@@ -1884,7 +1930,7 @@ export default function QSResultsPage() {
                   <div className="text-4xl mb-3">🎲</div>
                   <p className="text-slate-400 text-sm font-medium">아직 배정이 실행되지 않았습니다</p>
                   <p className="text-slate-500 text-xs mt-1">
-                    "🧪 테스트 시뮬레이션"으로 미리 확인하거나, 관리자 모드에서 확정 배정을 실행하세요
+                    관리자 모드에서 "🎲 랜덤배정출제"를 클릭하거나, 상단 네비바 "📋 랜덤 배정 출제 확정"으로 이동하세요
                   </p>
                 </div>
               ) : assignments.length > 0 && (
@@ -3431,6 +3477,88 @@ export default function QSResultsPage() {
                 <button
                   onClick={closeResetModal}
                   disabled={resetting}
+                  className="px-4 py-3 rounded-xl bg-slate-700 text-slate-300 font-medium hover:bg-slate-600 transition"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ 배정 초기화 확인 모달 ═══ */}
+      {showClearAssignConfirm && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center z-50 px-4 py-6 overflow-y-auto">
+          <div className="bg-slate-900 rounded-2xl border border-red-800/70 shadow-2xl w-full max-w-md overflow-hidden my-auto">
+            <div className="px-6 py-5 text-white" style={{ background: 'linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%)' }}>
+              <h3 className="text-lg font-bold flex items-center gap-2">⚠️ 배정 초기화 보안 확인</h3>
+              <p className="text-red-200 text-xs mt-1">관리자 비밀번호 + &quot;배정초기화하라&quot; 직접 입력 필수</p>
+            </div>
+            <div className="px-6 py-5 space-y-5">
+              <div className="bg-red-950/40 border border-red-800/50 rounded-xl px-4 py-3">
+                <p className="text-red-300 text-xs font-bold mb-1.5">초기화 시</p>
+                <ul className="text-xs text-red-400/90 space-y-0.5">
+                  <li>• localStorage의 2차 출제 배정 데이터가 삭제됩니다</li>
+                  <li>• 화면의 확정 배정 결과가 초기화됩니다</li>
+                </ul>
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-200 mb-2">
+                  <span className="w-5 h-5 rounded-full bg-red-900/60 border border-red-700 flex items-center justify-center text-xs text-red-300 font-black">1</span>
+                  관리자 비밀번호 입력
+                </label>
+                <input
+                  type="password"
+                  value={clearAssignPassword}
+                  onChange={(e) => setClearAssignPassword(e.target.value)}
+                  placeholder="관리자 비밀번호"
+                  className="w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 placeholder-slate-500 text-sm focus:border-red-500 outline-none transition"
+                />
+                {clearAssignPassword && (
+                  <p className={`text-xs mt-1 ${ADMINS.some((a) => a.password === clearAssignPassword) ? 'text-emerald-400' : 'text-red-500'}`}>
+                    {ADMINS.some((a) => a.password === clearAssignPassword) ? '✓ 비밀번호 확인됨' : '✗ 비밀번호 불일치'}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-200 mb-2">
+                  <span className="w-5 h-5 rounded-full bg-red-900/60 border border-red-700 flex items-center justify-center text-xs text-red-300 font-black">2</span>
+                  <span>
+                    아래 텍스트를 직접 입력하세요
+                    <span className="ml-2 px-2 py-0.5 rounded bg-slate-700 text-amber-300 font-mono text-xs border border-slate-600">{ASSIGN_RESET_KEYWORD}</span>
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={clearAssignText}
+                  onChange={(e) => setClearAssignText(e.target.value)}
+                  placeholder={`"${ASSIGN_RESET_KEYWORD}" 입력`}
+                  className={`w-full px-4 py-2.5 rounded-lg bg-slate-800 border text-sm text-slate-100 placeholder-slate-600 outline-none transition ${
+                    clearAssignText === '' ? 'border-slate-600 focus:border-red-500' :
+                    clearAssignText === ASSIGN_RESET_KEYWORD ? 'border-emerald-600 bg-emerald-950/30' : 'border-red-700 bg-red-950/20'
+                  }`}
+                />
+                {clearAssignText && (
+                  <p className={`text-xs mt-1 ${clearAssignText === ASSIGN_RESET_KEYWORD ? 'text-emerald-400' : 'text-red-500'}`}>
+                    {clearAssignText === ASSIGN_RESET_KEYWORD ? '✓ 확인됨' : '✗ 정확히 입력해 주세요'}
+                  </p>
+                )}
+              </div>
+              {clearAssignError && (
+                <div className="bg-red-900/30 border border-red-700 rounded-lg px-4 py-2.5 text-xs text-red-400">⚠️ {clearAssignError}</div>
+              )}
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={handleClearAssignmentConfirm}
+                  disabled={!ADMINS.some((a) => a.password === clearAssignPassword) || clearAssignText !== ASSIGN_RESET_KEYWORD}
+                  className="flex-1 text-white py-3 rounded-xl font-bold transition hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ background: 'linear-gradient(135deg, #dc2626 0%, #7f1d1d 100%)' }}
+                >
+                  배정 초기화 실행
+                </button>
+                <button
+                  onClick={closeClearAssignModal}
                   className="px-4 py-3 rounded-xl bg-slate-700 text-slate-300 font-medium hover:bg-slate-600 transition"
                 >
                   취소

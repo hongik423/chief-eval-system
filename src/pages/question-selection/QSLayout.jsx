@@ -28,6 +28,18 @@ export default function QSLayout() {
           </button>
 
           <div className="flex items-center gap-2">
+            <a
+              href="/"
+              className="text-xs bg-amber-900/40 text-amber-400 px-3 py-1 rounded-full font-medium hover:bg-amber-800/50 transition border border-amber-700/50"
+            >
+              📋 평가표 로그인
+            </a>
+            <button
+              onClick={() => navigate('/question-selection/assignment-confirm')}
+              className="text-xs bg-amber-900/40 text-amber-400 px-3 py-1 rounded-full font-medium hover:bg-amber-800/50 transition border border-amber-700/50"
+            >
+              📋 랜덤 배정 출제 확정
+            </button>
             <span className="text-xs bg-emerald-900/40 text-emerald-400 px-3 py-1 rounded-full font-medium border border-emerald-700/50">
               ✅ 1차 출제 마감
             </span>

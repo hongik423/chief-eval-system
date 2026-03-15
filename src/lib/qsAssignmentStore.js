@@ -14,7 +14,7 @@ const ACTIVE_PERIOD_ID = 'a0000000-0000-0000-0000-000000000001';
 export const ROUND2_CANDIDATES = [
   { id: 'kcg', name: '김창곤', team: '컨설팅6본부' },
   { id: 'bjy', name: '백진영', team: '미정' },
-  { id: 'yhh', name: '양현호', team: '월드클래스코리아' },
+  { id: 'yhh', name: '양현호', team: 'C팀' },
 ];
 
 // ─── 2차 출제 문제 풀 (1차 최종 선정 9문제) ──────────────────────
@@ -268,10 +268,35 @@ export function saveAssignmentsLocal(assignments) {
       },
     });
   });
-  // Supabase에도 비동기 동기화 (실패해도 localStorage는 유지)
+  // Supabase에도 비동기 동기화 (실패해도 localStorage는 유지) + 실행 로그 기록
   syncAssignmentsToSupabase(assignments).catch((err) =>
     console.warn('[Supabase Sync] 2차 배정 동기화 실패:', err)
   );
+}
+
+/** 2차 출제 랜덤 배정 실행 로그 기록 (qs_assignment_execution_log) */
+export async function logAssignmentExecution(assignments, step = 'assign', executedBy = 'system') {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from('qs_assignment_execution_log').insert({
+      period_id: ACTIVE_PERIOD_ID,
+      step,
+      executed_by: executedBy,
+      executed_at: new Date().toISOString(),
+      assignments_snapshot: assignments?.map((a) => ({
+        candidateId: a.candidateId,
+        candidateName: a.candidateName,
+        stock_transfer: a.stock_transfer,
+        nominee_stock: a.nominee_stock,
+        temporary_payment: a.temporary_payment,
+        seed: a.seed,
+      })),
+      metadata: { source: 'qs_assignment_store' },
+    });
+    if (error) throw error;
+  } catch (err) {
+    console.warn('[Supabase] 실행 로그 기록 실패:', err);
+  }
 }
 
 // ─── Supabase 동기화: 2차 배정 ─────────────────────────────────
@@ -292,6 +317,8 @@ async function syncAssignmentsToSupabase(assignments) {
     .upsert(rows, { onConflict: 'period_id,candidate_id' });
   if (error) throw error;
   console.log('[Supabase Sync] 2차 배정 동기화 완료:', rows.length, '건');
+  // 실행 로그 기록 (테이블 없으면 무시)
+  logAssignmentExecution(assignments, 'assign').catch(() => {});
 }
 
 // ─── Supabase에서 2차 배정 로드 (localStorage 유실 시 복구용) ───
