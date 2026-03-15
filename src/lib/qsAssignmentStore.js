@@ -718,9 +718,88 @@ export async function loadFinalDrawFromSupabase() {
       selectedAt: d.selected_at,
       selectedBy: d.selected_by,
       seed: d.seed,
+      confirmed: !!d.confirmed_at,
+      confirmedAt: d.confirmed_at || null,
     };
   });
   return results;
+}
+
+// ─── 4단계 최종 선정 확정 (관리자 확정 버튼 클릭) ─────────────
+/**
+ * 4단계 최종 1문제 확정 저장
+ * - qs_final_draw.confirmed_at 업데이트
+ * - qs_candidate_tracker.stage4 → confirmed: true
+ * - qs_candidate_tracker.stage5 → in_progress (인증평가 단계 진입)
+ * @param {string} candidateId - 피평가자 ID
+ * @param {string} category - 선정된 분야 키
+ * @param {number} questionId - 선정된 문제 번호
+ * @returns {Promise<{ confirmedAt: string }>}
+ */
+export async function confirmFinalSelection(candidateId, category, questionId) {
+  const confirmedAt = new Date().toISOString();
+
+  // 1. localStorage 추적 데이터 업데이트
+  updateCandidateTracker(candidateId, {
+    stage4: {
+      status: 'completed',
+      confirmed: true,
+      confirmedAt,
+      selectedCategory: category,
+      selectedQuestionId: questionId,
+    },
+    stage5: {
+      status: 'in_progress',
+      startedAt: confirmedAt,
+    },
+  });
+
+  // 2. Supabase qs_final_draw - confirmed_at 업데이트
+  if (supabase) {
+    // UPDATE 먼저 시도
+    const { error: updateErr } = await supabase
+      .from('qs_final_draw')
+      .update({ confirmed_at: confirmedAt })
+      .eq('period_id', ACTIVE_PERIOD_ID)
+      .eq('candidate_id', candidateId);
+
+    if (updateErr) {
+      // UPDATE 실패 시 UPSERT 시도 (행 없는 경우)
+      const { error: upsertErr } = await supabase
+        .from('qs_final_draw')
+        .upsert({
+          period_id: ACTIVE_PERIOD_ID,
+          candidate_id: candidateId,
+          selected_category: category,
+          selected_question_id: questionId,
+          confirmed_at: confirmedAt,
+        }, { onConflict: 'period_id,candidate_id' });
+      if (upsertErr) {
+        console.warn('[Supabase] 최종 확정 저장 실패:', upsertErr);
+        throw upsertErr;
+      }
+    }
+    console.log('[Supabase Sync] 최종 선정 확정 저장 완료:', candidateId, `#${questionId}`);
+  }
+
+  return { confirmedAt };
+}
+
+// ─── Supabase 전체 진행 현황 조회 (뷰 사용) ───────────────────
+/**
+ * qs_v_candidate_progress 뷰에서 전체 피평가자 진행 현황 로드
+ */
+export async function loadCandidateProgressFromSupabase() {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('qs_v_candidate_progress')
+    .select('*')
+    .eq('period_id', ACTIVE_PERIOD_ID);
+  if (error) {
+    console.warn('[Supabase] 진행 현황 로드 실패:', error);
+    return [];
+  }
+  return data || [];
 }
 
 /**

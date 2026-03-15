@@ -36,6 +36,8 @@ import {
   loadAssignmentsHybrid,
   loadTrackerHybrid,
   loadFinalDrawFromSupabase,
+  confirmFinalSelection,
+  loadCandidateProgressFromSupabase,
 } from '@/lib/qsAssignmentStore';
 
 const ALL_EVALUATORS = ['나동환', '권영도', '권오경', '김홍', '박성현', '윤덕상', '하상현'];
@@ -119,6 +121,12 @@ export default function QSResultsPage() {
   const [roulettePhase, setRoulettePhase] = useState('idle'); // idle | spinning | result
   const [rouletteResult, setRouletteResult] = useState(null);
   const [rouletteAngle, setRouletteAngle] = useState(0);
+  const [confirmingCandidate, setConfirmingCandidate] = useState(null); // 확정 저장 중인 candidateId
+
+  // ── Supabase 데이터 조회 패널
+  const [supabaseProgress, setSupabaseProgress] = useState([]);
+  const [showSupabasePanel, setShowSupabasePanel] = useState(false);
+  const [loadingSupabase, setLoadingSupabase] = useState(false);
 
   // 최신 results를 interval 내부에서 안전하게 참조하기 위한 ref
   const resultsRef = useRef([]);
@@ -167,15 +175,21 @@ export default function QSResultsPage() {
             restoredDraws[cid] = {
               category: rec.stage4.selectedCategory,
               questionId: rec.stage4.selectedQuestionId,
+              confirmed: rec.stage4.confirmed || false,
+              confirmedAt: rec.stage4.confirmedAt || null,
             };
           }
         });
 
-        // Supabase에서 추가 추첨 결과 보충
+        // Supabase에서 추가 추첨 결과 보충 (confirmed 상태 우선 반영)
         const supabaseDraws = await loadFinalDrawFromSupabase();
         Object.entries(supabaseDraws).forEach(([cid, draw]) => {
           if (!restoredDraws[cid]) {
             restoredDraws[cid] = draw;
+          } else if (draw.confirmed && !restoredDraws[cid].confirmed) {
+            // Supabase의 confirmed 상태가 더 최신이면 반영
+            restoredDraws[cid].confirmed = draw.confirmed;
+            restoredDraws[cid].confirmedAt = draw.confirmedAt;
           }
         });
 
@@ -460,6 +474,51 @@ export default function QSResultsPage() {
     setTrackerSummary(getCandidateTrackerSummary());
   };
 
+  // ── 4단계 최종 선정 확정 (룰렛 결과 후 "이 문제로 최종 확정" 버튼)
+  const handleConfirmFinalSelection = async () => {
+    if (!rouletteResult || !rouletteCandidateId) return;
+    setConfirmingCandidate(rouletteCandidateId);
+    try {
+      await confirmFinalSelection(
+        rouletteCandidateId,
+        rouletteResult.category,
+        rouletteResult.questionId
+      );
+      // drawResults에 confirmed 상태 반영
+      setDrawResults((prev) => ({
+        ...prev,
+        [rouletteCandidateId]: {
+          ...prev[rouletteCandidateId],
+          confirmed: true,
+          confirmedAt: new Date().toISOString(),
+        },
+      }));
+      setTrackerSummary(getCandidateTrackerSummary());
+      setShowRoulette(false);
+      setRoulettePhase('idle');
+    } catch (err) {
+      console.error('[Confirm] 최종 확정 오류:', err);
+      alert('확정 저장 중 오류가 발생했습니다: ' + (err.message || ''));
+    } finally {
+      setConfirmingCandidate(null);
+    }
+  };
+
+  // ── Supabase 전체 데이터 조회
+  const handleLoadSupabaseProgress = async () => {
+    setLoadingSupabase(true);
+    try {
+      const progress = await loadCandidateProgressFromSupabase();
+      setSupabaseProgress(progress);
+      setShowSupabasePanel(true);
+    } catch (err) {
+      console.warn('[Supabase] 진행 현황 조회 실패:', err);
+      alert('Supabase 조회 실패: ' + (err.message || ''));
+    } finally {
+      setLoadingSupabase(false);
+    }
+  };
+
   // ── URL 복사
   const handleCopyUrl = async (token) => {
     const url = `${window.location.origin}/question-selection/exam/${token}`;
@@ -742,13 +801,35 @@ export default function QSResultsPage() {
                         {cs?.name} · {new Date().toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 추첨
                       </p>
                     </div>
+                    {/* ── 최종 확정 버튼 (관리자 전용) ── */}
+                    {adminMode && (
+                      <button
+                        onClick={handleConfirmFinalSelection}
+                        disabled={confirmingCandidate === rouletteCandidateId}
+                        className="w-full py-3.5 rounded-2xl text-base font-black text-white transition hover:opacity-90 active:scale-95 shadow-lg mb-2"
+                        style={{
+                          background: confirmingCandidate === rouletteCandidateId
+                            ? 'linear-gradient(135deg, #065f46 0%, #064e3b 100%)'
+                            : 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                          opacity: confirmingCandidate === rouletteCandidateId ? 0.8 : 1,
+                        }}
+                      >
+                        {confirmingCandidate === rouletteCandidateId
+                          ? '⏳ 확정 저장 중...'
+                          : '🎯 이 문제로 최종 확정'}
+                      </button>
+                    )}
                     {/* 닫기 버튼 */}
                     <button
                       onClick={() => { setShowRoulette(false); setRoulettePhase('idle'); }}
-                      className="w-full py-3.5 rounded-2xl text-base font-black text-white transition hover:opacity-90 active:scale-95 shadow-lg"
-                      style={{ background: 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)' }}
+                      className="w-full py-2.5 rounded-xl text-sm font-bold transition"
+                      style={{
+                        background: adminMode ? 'transparent' : 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)',
+                        color: adminMode ? '#64748b' : '#fff',
+                        border: adminMode ? '1px solid #334155' : 'none',
+                      }}
                     >
-                      ✅ 확인 · 닫기
+                      {adminMode ? '닫기 (나중에 확정)' : '✅ 확인 · 닫기'}
                     </button>
                   </div>
                 );
@@ -1855,7 +1936,11 @@ export default function QSResultsPage() {
                     <div
                       key={cs.candidateId}
                       className="rounded-2xl border overflow-hidden"
-                      style={{ borderColor: draw ? '#166534' : '#374151', background: 'rgba(15,23,42,0.6)' }}
+                      style={{
+                        borderColor: draw?.confirmed ? '#059669' : draw ? '#166534' : '#374151',
+                        background: 'rgba(15,23,42,0.6)',
+                        boxShadow: draw?.confirmed ? '0 0 12px rgba(5,150,105,0.15)' : 'none',
+                      }}
                     >
                       {/* 후보자 헤더 */}
                       <div className="px-5 py-3.5 flex items-center gap-3 border-b" style={{ borderColor: '#1e293b' }}>
@@ -1912,8 +1997,41 @@ export default function QSResultsPage() {
                             </div>
                           ) : draw ? (
                             <div>
-                              <span className="text-lg font-black text-red-400">#{draw.questionId}</span>
-                              <p className="text-[10px] text-red-500/80">{getCategoryLabel(draw.category)}</p>
+                              <span className="text-lg font-black" style={{ color: draw.confirmed ? '#34d399' : '#f87171' }}>
+                                #{draw.questionId}
+                              </span>
+                              <p className="text-[10px]" style={{ color: draw.confirmed ? '#6ee7b7' : '#fca5a580' }}>
+                                {getCategoryLabel(draw.category)}
+                              </p>
+                              {draw.confirmed ? (
+                                <span
+                                  className="inline-block text-[9px] px-2 py-0.5 rounded-full font-bold mt-1"
+                                  style={{ background: 'rgba(5,150,105,0.2)', color: '#34d399', border: '1px solid #065f4680' }}
+                                >
+                                  ✅ 확정완료
+                                </span>
+                              ) : adminMode && (
+                                <button
+                                  onClick={() => {
+                                    setRouletteResult(drawResults[cs.candidateId]);
+                                    setRouletteCandidateId(cs.candidateId);
+                                    setRouletteQuestions(ROULETTE_CATS.map((cat) => ({
+                                      ...cat,
+                                      questionId: cs?.record?.stage2?.[cat.key] ?? '?',
+                                    })));
+                                    setRoulettePhase('result');
+                                    setRouletteAngle(0);
+                                    setShowRoulette(true);
+                                  }}
+                                  className="block mx-auto mt-1 text-[9px] px-2 py-0.5 rounded font-bold transition"
+                                  style={{ background: '#166534', color: '#4ade80', border: '1px solid #16653480' }}
+                                >
+                                  🎯 확정하기
+                                </button>
+                              )}
+                              {!draw.confirmed && !adminMode && (
+                                <span className="text-[9px] text-amber-500/60 block mt-0.5">미확정</span>
+                              )}
                             </div>
                           ) : (
                             <div>
@@ -1985,19 +2103,270 @@ export default function QSResultsPage() {
               )}
 
               {/* 추첨 완료 배너 */}
-              {Object.keys(drawResults).length === 3 && (
-                <div
-                  className="mt-4 rounded-xl px-5 py-3 border flex items-center gap-3"
-                  style={{ borderColor: '#166534', background: 'rgba(22,101,52,0.1)' }}
-                >
-                  <span className="text-xl">✅</span>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-emerald-400">4단계 최종 추첨 완료</p>
-                    <p className="text-xs text-emerald-600">3명 모두 최종 1문제가 확정되었습니다 · 추첨 결과가 저장됨</p>
+              {Object.keys(drawResults).length === 3 && (() => {
+                const confirmedCount = Object.values(drawResults).filter(d => d.confirmed).length;
+                const allConfirmed = confirmedCount === 3;
+                return (
+                  <div
+                    className="mt-4 rounded-xl px-5 py-3 border flex items-center gap-3"
+                    style={{
+                      borderColor: allConfirmed ? '#059669' : '#166534',
+                      background: allConfirmed ? 'rgba(5,150,105,0.15)' : 'rgba(22,101,52,0.1)',
+                    }}
+                  >
+                    <span className="text-xl">{allConfirmed ? '🏆' : '✅'}</span>
+                    <div className="flex-1">
+                      {allConfirmed ? (
+                        <>
+                          <p className="text-sm font-bold text-emerald-300">4단계 최종 선정 확정 완료!</p>
+                          <p className="text-xs text-emerald-500">
+                            3명 모두 최종 문제가 확정되었습니다 · Supabase에 저장됨 · 5단계 인증평가 진행
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-bold text-emerald-400">4단계 추첨 완료 ({confirmedCount}/3명 확정)</p>
+                          <p className="text-xs text-emerald-600">
+                            추첨은 완료되었으나 아직 미확정 인원이 있습니다. 관리자가 "확정하기" 버튼을 눌러 최종 확정하세요.
+                          </p>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════
+          Supabase 전체 워크플로우 데이터 조회 대시보드
+      ════════════════════════════════════════════════════════ */}
+      {votingConfig.closed && assignments.length > 0 && (
+        <div className="mt-8">
+          <div
+            className="rounded-2xl overflow-hidden border-2 shadow-2xl"
+            style={{ borderColor: '#1e40af', background: 'linear-gradient(135deg, #030712 0%, #0c1524 100%)' }}
+          >
+            {/* 헤더 */}
+            <div
+              className="px-6 py-5 flex items-center justify-between"
+              style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%)' }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">🗄️</span>
+                <div>
+                  <h2 className="text-lg font-black text-blue-100">Supabase 전체 데이터 조회</h2>
+                  <p className="text-xs text-blue-300/70 font-medium">
+                    전체 워크플로우 8단계 데이터 실시간 확인 · qs_v_candidate_progress 뷰
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleLoadSupabaseProgress}
+                disabled={loadingSupabase}
+                className="text-xs px-4 py-2 rounded-xl font-bold border transition hover:opacity-80 active:scale-95"
+                style={{
+                  borderColor: '#93c5fd',
+                  color: '#93c5fd',
+                  background: loadingSupabase ? 'rgba(59,130,246,0.2)' : 'rgba(30,58,138,0.4)',
+                }}
+              >
+                {loadingSupabase ? '⏳ 로딩중...' : '🔍 Supabase 데이터 조회'}
+              </button>
+            </div>
+
+            {/* 조회 결과 */}
+            {showSupabasePanel && (
+              <div className="px-6 py-5">
+                {supabaseProgress.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-slate-500 text-sm">Supabase에 데이터가 없습니다</p>
+                    <p className="text-xs text-slate-600 mt-1">
+                      Migration SQL을 실행한 후 배정·추첨을 진행하면 데이터가 저장됩니다
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-4">
+                      {supabaseProgress.map((row) => {
+                        const stageColor = row.current_stage >= 5 ? '#059669' :
+                          row.current_stage >= 4 ? '#d97706' : '#3b82f6';
+                        return (
+                          <div
+                            key={row.candidate_id}
+                            className="rounded-2xl border overflow-hidden"
+                            style={{ borderColor: '#1e3a8a40', background: 'rgba(15,23,42,0.8)' }}
+                          >
+                            {/* 후보자 헤더 */}
+                            <div
+                              className="px-5 py-3 flex items-center gap-3 border-b"
+                              style={{ background: 'rgba(30,58,138,0.25)', borderColor: '#1e3a8a30' }}
+                            >
+                              <div
+                                className="w-10 h-10 rounded-xl flex items-center justify-center text-base font-black flex-shrink-0"
+                                style={{ background: 'linear-gradient(135deg, #1e3a8a, #2563eb)', color: '#fff' }}
+                              >
+                                {row.candidate_name?.charAt(0)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-slate-100 text-sm">{row.candidate_name}</p>
+                                <p className="text-xs text-slate-500">{row.team}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="text-xs px-3 py-1 rounded-lg font-black"
+                                  style={{ background: `${stageColor}20`, color: stageColor, border: `1px solid ${stageColor}50` }}
+                                >
+                                  STAGE {row.current_stage}
+                                </span>
+                                {row.draw_confirmed_at && (
+                                  <span
+                                    className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                                    style={{ background: 'rgba(5,150,105,0.2)', color: '#34d399', border: '1px solid #05966940' }}
+                                  >
+                                    ✅ 확정완료
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* 단계별 데이터 그리드 */}
+                            <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              {/* 2차 배정 */}
+                              <div className="rounded-xl p-3 border border-blue-900/30 bg-blue-900/10">
+                                <p className="text-[10px] text-blue-400 font-bold mb-1">📊 2차 배정</p>
+                                {row.r2_stock_transfer ? (
+                                  <div className="space-y-0.5">
+                                    <p className="text-[11px] text-blue-300 font-mono">주식: #{row.r2_stock_transfer}</p>
+                                    <p className="text-[11px] text-purple-300 font-mono">차명: #{row.r2_nominee_stock}</p>
+                                    <p className="text-[11px] text-emerald-300 font-mono">가지: #{row.r2_temporary_payment}</p>
+                                  </div>
+                                ) : (
+                                  <p className="text-[11px] text-slate-600">미배정</p>
+                                )}
+                              </div>
+
+                              {/* 최종 추첨 */}
+                              <div className="rounded-xl p-3 border border-red-900/30 bg-red-900/10">
+                                <p className="text-[10px] text-red-400 font-bold mb-1">🎰 최종 추첨</p>
+                                {row.selected_question_id ? (
+                                  <>
+                                    <p className="text-base font-black text-red-300">#{row.selected_question_id}</p>
+                                    <p className="text-[10px] text-red-400/60">{getCategoryLabel(row.selected_category)}</p>
+                                    {row.draw_confirmed_at && (
+                                      <p className="text-[9px] text-emerald-500 mt-0.5">
+                                        확정: {new Date(row.draw_confirmed_at).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                      </p>
+                                    )}
+                                  </>
+                                ) : (
+                                  <p className="text-[11px] text-slate-600">미추첨</p>
+                                )}
+                              </div>
+
+                              {/* 인증 결과 */}
+                              <div className="rounded-xl p-3 border border-emerald-900/30 bg-emerald-900/10">
+                                <p className="text-[10px] text-emerald-400 font-bold mb-1">🏆 인증 결과</p>
+                                {row.pass_status && row.pass_status !== 'pending' ? (
+                                  <>
+                                    <p className={`text-sm font-black ${row.pass_status === 'pass' ? 'text-emerald-300' : 'text-red-400'}`}>
+                                      {row.pass_status === 'pass' ? '합격' : '불합격'}
+                                    </p>
+                                    {row.total_score && (
+                                      <p className="text-[10px] text-slate-400">{row.total_score}점</p>
+                                    )}
+                                    {row.certificate_number && (
+                                      <p className="text-[9px] text-amber-400 font-mono mt-0.5">{row.certificate_number}</p>
+                                    )}
+                                  </>
+                                ) : (
+                                  <p className="text-[11px] text-slate-600">미결정</p>
+                                )}
+                              </div>
+
+                              {/* 업데이트 시각 */}
+                              <div className="rounded-xl p-3 border border-slate-700/40 bg-slate-800/40">
+                                <p className="text-[10px] text-slate-500 font-bold mb-1">🕐 최근 업데이트</p>
+                                <p className="text-[11px] text-slate-400 font-mono leading-relaxed">
+                                  {row.updated_at
+                                    ? new Date(row.updated_at).toLocaleString('ko-KR', {
+                                        month: 'short', day: 'numeric',
+                                        hour: '2-digit', minute: '2-digit',
+                                      })
+                                    : '-'}
+                                </p>
+                                <p className="text-[9px] text-slate-600 mt-1">
+                                  생성: {row.created_at
+                                    ? new Date(row.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
+                                    : '-'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* 단계별 상태 바 */}
+                            <div className="px-5 pb-4">
+                              <div className="flex items-center gap-1">
+                                {[1,2,3,4,5,6,7,8].map((n) => {
+                                  const stageKey = `stage${n}_data`;
+                                  const stageData = row[stageKey];
+                                  const done = stageData?.status === 'completed';
+                                  const inProgress = stageData?.status === 'in_progress';
+                                  return (
+                                    <div
+                                      key={n}
+                                      className="flex-1 h-1.5 rounded-full transition-all"
+                                      style={{
+                                        background: done ? '#059669' : inProgress ? '#d97706' : '#1e293b',
+                                      }}
+                                      title={`${n}단계: ${stageData?.status || 'pending'}`}
+                                    />
+                                  );
+                                })}
+                              </div>
+                              <div className="flex justify-between mt-1">
+                                <span className="text-[9px] text-slate-600">1차출제</span>
+                                <span className="text-[9px] text-slate-600">인증서수여</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] text-slate-600 text-center mt-3">
+                      📡 Supabase qs_v_candidate_progress 뷰 · 조회: {new Date().toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* 안내 (미조회 상태) */}
+            {!showSupabasePanel && (
+              <div className="px-6 py-5">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  {[
+                    { table: 'qs_candidate_tracker', desc: '8단계 전체 진행 상태', icon: '📋' },
+                    { table: 'qs_round2_assignments', desc: '2차 배정 결과', icon: '🎲' },
+                    { table: 'qs_final_draw', desc: '4단계 추첨 + 확정', icon: '🎰' },
+                    { table: 'qs_certification_results', desc: '최종 인증 결과', icon: '🏆' },
+                  ].map(({ table, desc, icon }) => (
+                    <div
+                      key={table}
+                      className="rounded-xl p-3 border border-blue-900/30 bg-blue-900/10 text-center"
+                    >
+                      <span className="text-xl block mb-1">{icon}</span>
+                      <p className="text-[10px] font-bold text-blue-400 font-mono">{table}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">{desc}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-600 text-center mt-3">
+                  위 버튼을 클릭하면 Supabase에서 실시간 데이터를 조회합니다
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2374,6 +2743,9 @@ export default function QSResultsPage() {
           </div>
         </div>
       )}
+
+      {/* 빌드 버전 (배포 검증용) */}
+      <p className="text-[10px] text-slate-600 text-center py-4">빌드: 2026-03-15-roulette</p>
     </div>
   );
 }
