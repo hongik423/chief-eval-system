@@ -832,6 +832,224 @@ export function getCandidateTrackerSummary() {
   });
 }
 
+// ================================================================
+// 5단계: 인증평가 실시
+// ================================================================
+
+/**
+ * 5단계 인증평가 시작
+ * @param {string} candidateId - 피평가자 ID
+ */
+export function startEvaluation(candidateId) {
+  const startedAt = new Date().toISOString();
+  updateCandidateTracker(candidateId, {
+    stage5: {
+      status: 'in_progress',
+      evaluationStarted: startedAt,
+    },
+  });
+  return { startedAt };
+}
+
+/**
+ * 5단계 인증평가 완료
+ * @param {string} candidateId - 피평가자 ID
+ */
+export function completeEvaluation(candidateId) {
+  const completedAt = new Date().toISOString();
+  updateCandidateTracker(candidateId, {
+    stage5: {
+      status: 'completed',
+      evaluationCompleted: completedAt,
+    },
+  });
+  return { completedAt };
+}
+
+// ================================================================
+// 6단계: 평가위원 협의 — 점수 입력, 합격/불합격 결정
+// PM 역량평가 100점 + 가점 10점, 평균 70점 이상 합격
+// 평균 = 평가총점수 ÷ 평가위원수
+// ================================================================
+
+/** 7명 평가위원 목록 */
+export const EVALUATORS = ['나동환', '권영도', '권오경', '김홍', '박성현', '윤덕상', '하상현'];
+
+/**
+ * 6단계 평가위원 점수 제출 및 합격/불합격 결정
+ * @param {string} candidateId - 피평가자 ID
+ * @param {Array<{evaluator: string, pmScore: number, bonusScore: number}>} scores
+ *   - evaluator: 평가위원 이름
+ *   - pmScore: PM 역량평가 점수 (0~100)
+ *   - bonusScore: 가점 (0~10)
+ * @param {string} [consensusNotes] - 평가위원 협의 메모
+ * @returns {{ finalAverage: number, passStatus: string, scores: Array }}
+ */
+export function submitEvaluatorScores(candidateId, scores, consensusNotes = '') {
+  if (!scores || scores.length === 0) {
+    throw new Error('최소 1명 이상의 평가위원 점수가 필요합니다.');
+  }
+
+  // 각 평가위원별 총점 = pmScore + bonusScore
+  const evaluatorTotals = scores.map((s) => ({
+    evaluator: s.evaluator,
+    pmScore: Math.min(100, Math.max(0, Number(s.pmScore) || 0)),
+    bonusScore: Math.min(10, Math.max(0, Number(s.bonusScore) || 0)),
+    total: Math.min(100, Math.max(0, Number(s.pmScore) || 0)) + Math.min(10, Math.max(0, Number(s.bonusScore) || 0)),
+  }));
+
+  // 평균 = 평가총점수 ÷ 평가위원수
+  const totalSum = evaluatorTotals.reduce((sum, s) => sum + s.total, 0);
+  const finalAverage = Math.round((totalSum / evaluatorTotals.length) * 100) / 100;
+
+  // 70점 이상 합격
+  const passStatus = finalAverage >= 70 ? 'passed' : 'failed';
+  const decidedAt = new Date().toISOString();
+
+  // localStorage 추적 저장
+  updateCandidateTracker(candidateId, {
+    stage5: { status: 'completed' },
+    stage6: {
+      status: 'completed',
+      scores: evaluatorTotals,
+      totalSum,
+      evaluatorCount: evaluatorTotals.length,
+      finalAverage,
+      passStatus,
+      decidedAt,
+      consensusNotes,
+    },
+  });
+
+  // Supabase 비동기 동기화
+  syncCertificationToSupabase(candidateId, {
+    finalAverage,
+    passStatus,
+    scores: evaluatorTotals,
+    consensusNotes,
+    decidedAt,
+  }).catch((err) => console.warn('[Supabase Sync] 6단계 점수 동기화 실패:', err));
+
+  return { finalAverage, passStatus, scores: evaluatorTotals, decidedAt };
+}
+
+// ================================================================
+// 7단계: 최종 결과 발표
+// ================================================================
+
+/**
+ * 7단계 결과 발표 (합격/불합격만 공개, 점수 비공개, 개별 피드백)
+ * @param {string} candidateId - 피평가자 ID
+ * @param {string} feedback - 개별 피드백 내용
+ */
+export function announceResult(candidateId, feedback = '') {
+  const announcedAt = new Date().toISOString();
+  updateCandidateTracker(candidateId, {
+    stage7: {
+      status: 'completed',
+      announcedAt,
+      feedback,
+    },
+  });
+
+  // Supabase 동기화 (announced_at 업데이트)
+  syncAnnouncementToSupabase(candidateId, announcedAt, feedback)
+    .catch((err) => console.warn('[Supabase Sync] 7단계 발표 동기화 실패:', err));
+
+  return { announcedAt };
+}
+
+// ================================================================
+// 8단계: 인증서 수여식
+// ================================================================
+
+/**
+ * 8단계 인증서 발급
+ * @param {string} candidateId - 피평가자 ID
+ * @param {string} certificateNumber - 인증서 번호
+ * @param {string} ceremonyDate - 수여식 일자
+ */
+export function issueCertificate(candidateId, certificateNumber, ceremonyDate = CERT_DATE_STR) {
+  const issuedAt = new Date().toISOString();
+  updateCandidateTracker(candidateId, {
+    stage8: {
+      status: 'completed',
+      certificateNumber,
+      issuedAt,
+      ceremonyDate,
+    },
+  });
+
+  // Supabase 동기화
+  syncCertificateToSupabase(candidateId, certificateNumber, issuedAt, ceremonyDate)
+    .catch((err) => console.warn('[Supabase Sync] 8단계 인증서 동기화 실패:', err));
+
+  return { certificateNumber, issuedAt, ceremonyDate };
+}
+
+/**
+ * 인증서 번호 자동 생성
+ * 형식: CHIEF-2026-001 (연도-일련번호)
+ */
+export function generateCertificateNumber(candidateId) {
+  const year = new Date().getFullYear();
+  const candidateIndex = ROUND2_CANDIDATES.findIndex((c) => c.id === candidateId);
+  const seq = String(candidateIndex + 1).padStart(3, '0');
+  return `CHIEF-${year}-${seq}`;
+}
+
+// ─── Supabase 동기화: 6단계 인증 결과 ────────────────────────────
+async function syncCertificationToSupabase(candidateId, data) {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('qs_certification_results')
+    .upsert({
+      period_id: ACTIVE_PERIOD_ID,
+      candidate_id: candidateId,
+      total_score: data.finalAverage,
+      pass_status: data.passStatus === 'passed' ? 'pass' : 'fail',
+      evaluator_scores: data.scores,
+      consensus_notes: data.consensusNotes || null,
+      decided_at: data.decidedAt,
+    }, { onConflict: 'period_id,candidate_id' });
+  if (error) throw error;
+  console.log('[Supabase Sync] 인증 결과 동기화 완료:', candidateId, data.passStatus);
+}
+
+// ─── Supabase 동기화: 7단계 발표 ────────────────────────────────
+async function syncAnnouncementToSupabase(candidateId, announcedAt, feedback) {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('qs_certification_results')
+    .update({
+      announced_at: announcedAt,
+      feedback: feedback || null,
+    })
+    .eq('period_id', ACTIVE_PERIOD_ID)
+    .eq('candidate_id', candidateId);
+  if (error) {
+    console.warn('[Supabase] 7단계 발표 UPDATE 실패, UPSERT 시도:', error);
+    // UPDATE 실패 시 row가 없을 수 있으므로 무시
+  }
+}
+
+// ─── Supabase 동기화: 8단계 인증서 ──────────────────────────────
+async function syncCertificateToSupabase(candidateId, certificateNumber, issuedAt, ceremonyDate) {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('qs_certification_results')
+    .update({
+      certificate_number: certificateNumber,
+      issued_at: issuedAt,
+      ceremony_date: ceremonyDate,
+    })
+    .eq('period_id', ACTIVE_PERIOD_ID)
+    .eq('candidate_id', candidateId);
+  if (error) {
+    console.warn('[Supabase] 8단계 인증서 UPDATE 실패:', error);
+  }
+}
+
 /** 분야 키 → 한글 라벨 변환 */
 function getCategoryLabel(catKey) {
   const labels = {

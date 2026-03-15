@@ -38,6 +38,14 @@ import {
   loadFinalDrawFromSupabase,
   confirmFinalSelection,
   loadCandidateProgressFromSupabase,
+  // 5~8단계 핸들러
+  startEvaluation,
+  completeEvaluation,
+  submitEvaluatorScores,
+  announceResult,
+  issueCertificate,
+  generateCertificateNumber,
+  EVALUATORS,
 } from '@/lib/qsAssignmentStore';
 
 const ALL_EVALUATORS = ['나동환', '권영도', '권오경', '김홍', '박성현', '윤덕상', '하상현'];
@@ -127,6 +135,23 @@ export default function QSResultsPage() {
   const [supabaseProgress, setSupabaseProgress] = useState([]);
   const [showSupabasePanel, setShowSupabasePanel] = useState(false);
   const [loadingSupabase, setLoadingSupabase] = useState(false);
+
+  // ── 5단계: 인증평가 실시
+  const [showEvalPanel, setShowEvalPanel] = useState(false);
+
+  // ── 6단계: 평가위원 점수 입력
+  const [showScoringPanel, setShowScoringPanel] = useState(false);
+  const [scoringCandidateId, setScoringCandidateId] = useState(null);
+  const [evaluatorScores, setEvaluatorScores] = useState({}); // { evaluatorName: { pmScore, bonusScore } }
+  const [consensusNotes, setConsensusNotes] = useState('');
+  const [scoringResult, setScoringResult] = useState(null); // 제출 후 결과
+
+  // ── 7단계: 결과 발표
+  const [showAnnouncementPanel, setShowAnnouncementPanel] = useState(false);
+  const [feedbackInputs, setFeedbackInputs] = useState({}); // { candidateId: string }
+
+  // ── 8단계: 인증서 수여
+  const [showCertPanel, setShowCertPanel] = useState(false);
 
   // 최신 results를 interval 내부에서 안전하게 참조하기 위한 ref
   const resultsRef = useRef([]);
@@ -524,6 +549,66 @@ export default function QSResultsPage() {
     }
   };
 
+  // ── 5단계: 인증평가 시작/완료
+  const handleStartEval = (candidateId) => {
+    startEvaluation(candidateId);
+    setTrackerSummary(getCandidateTrackerSummary());
+  };
+  const handleCompleteEval = (candidateId) => {
+    completeEvaluation(candidateId);
+    setTrackerSummary(getCandidateTrackerSummary());
+  };
+
+  // ── 6단계: 점수 입력 패널 열기
+  const handleOpenScoring = (candidateId) => {
+    setScoringCandidateId(candidateId);
+    // 초기화: 7명 평가위원 빈 점수
+    const initial = {};
+    EVALUATORS.forEach((name) => {
+      initial[name] = { pmScore: '', bonusScore: '' };
+    });
+    setEvaluatorScores(initial);
+    setConsensusNotes('');
+    setScoringResult(null);
+    setShowScoringPanel(true);
+  };
+
+  // ── 6단계: 점수 제출
+  const handleSubmitScores = () => {
+    const scores = Object.entries(evaluatorScores)
+      .filter(([, v]) => v.pmScore !== '' && v.pmScore !== null)
+      .map(([evaluator, v]) => ({
+        evaluator,
+        pmScore: Number(v.pmScore),
+        bonusScore: Number(v.bonusScore) || 0,
+      }));
+    if (scores.length === 0) {
+      alert('최소 1명 이상의 평가위원 점수를 입력해주세요.');
+      return;
+    }
+    try {
+      const result = submitEvaluatorScores(scoringCandidateId, scores, consensusNotes);
+      setScoringResult(result);
+      setTrackerSummary(getCandidateTrackerSummary());
+    } catch (err) {
+      alert('점수 제출 오류: ' + err.message);
+    }
+  };
+
+  // ── 7단계: 결과 발표
+  const handleAnnounce = (candidateId) => {
+    const feedback = feedbackInputs[candidateId] || '';
+    announceResult(candidateId, feedback);
+    setTrackerSummary(getCandidateTrackerSummary());
+  };
+
+  // ── 8단계: 인증서 발급
+  const handleIssueCert = (candidateId) => {
+    const certNumber = generateCertificateNumber(candidateId);
+    issueCertificate(candidateId, certNumber);
+    setTrackerSummary(getCandidateTrackerSummary());
+  };
+
   // ── URL 복사
   const handleCopyUrl = async (token) => {
     const url = `${window.location.origin}/question-selection/exam/${token}`;
@@ -572,7 +657,7 @@ export default function QSResultsPage() {
       <div className="max-w-4xl mx-auto mt-16 text-center">
         <div className="text-5xl mb-4 animate-spin inline-block">⏳</div>
         <p className="text-slate-400">투표 결과를 불러오는 중...</p>
-        <p className="text-[10px] text-slate-600 mt-6">빌드: 2026-03-15-roulette</p>
+        <p className="text-[10px] text-slate-600 mt-6">빌드: 2026-03-15-stage5to8</p>
       </div>
     );
   }
@@ -2377,6 +2462,411 @@ export default function QSResultsPage() {
         </div>
       )}
 
+      {/* ════════════════════════════════════════════════════════
+          5~8단계 인증평가 워크플로우 패널
+      ════════════════════════════════════════════════════════ */}
+      {votingConfig.closed && assignments.length > 0 && adminMode && (
+        <div className="mt-8">
+          <div
+            className="rounded-2xl overflow-hidden border-2 shadow-2xl"
+            style={{ borderColor: '#7c3aed', background: 'linear-gradient(135deg, #030712 0%, #1a0a2e 100%)' }}
+          >
+            {/* 헤더 */}
+            <div
+              className="px-6 py-5"
+              style={{ background: 'linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%)' }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">📋</span>
+                <div>
+                  <h2 className="text-lg font-black text-purple-100">5~8단계 인증평가 워크플로우</h2>
+                  <p className="text-xs text-purple-300/70 font-medium">
+                    인증평가 실시 → 평가위원 협의 → 결과 발표 → 인증서 수여
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-6">
+              {/* ── 5단계: 인증평가 실시 ── */}
+              <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#1e40af40', background: 'rgba(15,23,42,0.6)' }}>
+                <div
+                  className="px-5 py-3 flex items-center justify-between cursor-pointer"
+                  style={{ background: 'rgba(59,130,246,0.15)' }}
+                  onClick={() => setShowEvalPanel(!showEvalPanel)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">📋</span>
+                    <span className="text-sm font-bold text-blue-300">5단계: 인증평가 실시</span>
+                    <span className="text-[10px] text-blue-500">3월 28일 10:00~18:00</span>
+                  </div>
+                  <span className="text-xs text-blue-400">{showEvalPanel ? '△' : '▽'}</span>
+                </div>
+                {showEvalPanel && (
+                  <div className="px-5 py-4 space-y-3">
+                    <div className="grid grid-cols-1 gap-3">
+                      {trackerSummary.map((cs) => {
+                        const stage5 = cs.record?.stage5 || {};
+                        const isStarted = stage5.status === 'in_progress' || stage5.status === 'completed';
+                        const isCompleted = stage5.status === 'completed';
+                        return (
+                          <div key={cs.candidateId} className="flex items-center gap-3 rounded-lg p-3 border border-slate-700/50 bg-slate-800/40">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black"
+                              style={{ background: 'linear-gradient(135deg, #1e3a8a, #2563eb)', color: '#fff' }}>
+                              {cs.name.charAt(0)}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-bold text-slate-200">{cs.name} <span className="text-xs text-slate-500 font-normal">{cs.team}</span></p>
+                              <p className="text-[10px] text-slate-500">
+                                {isCompleted ? `✅ 평가완료 (${new Date(stage5.evaluationCompleted).toLocaleString('ko-KR', { hour: '2-digit', minute: '2-digit' })})` :
+                                 isStarted ? `🔄 평가진행중 (${new Date(stage5.evaluationStarted).toLocaleString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 시작)` :
+                                 '⏳ 대기중'}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              {!isStarted && (
+                                <button
+                                  onClick={() => handleStartEval(cs.candidateId)}
+                                  className="text-[11px] px-3 py-1.5 rounded-lg font-bold border transition hover:opacity-80"
+                                  style={{ borderColor: '#3b82f6', color: '#93c5fd', background: 'rgba(59,130,246,0.15)' }}
+                                >
+                                  ▶ 평가 시작
+                                </button>
+                              )}
+                              {isStarted && !isCompleted && (
+                                <button
+                                  onClick={() => handleCompleteEval(cs.candidateId)}
+                                  className="text-[11px] px-3 py-1.5 rounded-lg font-bold border transition hover:opacity-80"
+                                  style={{ borderColor: '#059669', color: '#6ee7b7', background: 'rgba(5,150,105,0.15)' }}
+                                >
+                                  ✅ 평가 완료
+                                </button>
+                              )}
+                              {isCompleted && (
+                                <span className="text-[11px] px-3 py-1.5 rounded-lg font-bold" style={{ color: '#34d399' }}>완료됨</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="text-[10px] text-slate-600 border-t border-slate-700/50 pt-2">
+                      사전교육(9:00~10:00) → 오전 인터뷰(10:00~13:00) → 점심 → 오후 프레젠테이션(15:00~17:00) → 피드백(17:00~18:00)
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── 6단계: 평가위원 협의 (점수 입력) ── */}
+              <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#7c3aed40', background: 'rgba(15,23,42,0.6)' }}>
+                <div
+                  className="px-5 py-3 flex items-center justify-between cursor-pointer"
+                  style={{ background: 'rgba(124,58,237,0.15)' }}
+                  onClick={() => setShowScoringPanel(!showScoringPanel)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🤝</span>
+                    <span className="text-sm font-bold text-purple-300">6단계: 평가위원 협의</span>
+                    <span className="text-[10px] text-purple-500">합격기준: 평균 70점 이상</span>
+                  </div>
+                  <span className="text-xs text-purple-400">{showScoringPanel ? '△' : '▽'}</span>
+                </div>
+                {showScoringPanel && (
+                  <div className="px-5 py-4 space-y-4">
+                    {/* 피평가자 선택 탭 */}
+                    <div className="flex gap-2">
+                      {trackerSummary.map((cs) => {
+                        const stage6 = cs.record?.stage6 || {};
+                        const isDone = stage6.status === 'completed';
+                        return (
+                          <button
+                            key={cs.candidateId}
+                            onClick={() => handleOpenScoring(cs.candidateId)}
+                            className={`flex-1 py-2 rounded-lg text-xs font-bold border transition ${
+                              scoringCandidateId === cs.candidateId
+                                ? 'border-purple-500 bg-purple-900/40 text-purple-200'
+                                : isDone
+                                ? 'border-emerald-700 bg-emerald-900/20 text-emerald-400'
+                                : 'border-slate-600 bg-slate-800 text-slate-400 hover:border-slate-500'
+                            }`}
+                          >
+                            {isDone ? '✅ ' : ''}{cs.name}
+                            {isDone && ` (${stage6.finalAverage}점)`}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* 점수 입력 폼 */}
+                    {scoringCandidateId && !scoringResult && (
+                      <div className="space-y-3">
+                        <div className="rounded-lg border border-slate-700/50 overflow-hidden">
+                          <div className="grid grid-cols-[1fr,80px,80px,60px] gap-0 text-[10px] font-bold text-slate-400 px-3 py-2 border-b border-slate-700/50 bg-slate-800/60">
+                            <span>평가위원</span>
+                            <span className="text-center">PM역량 (100)</span>
+                            <span className="text-center">가점 (10)</span>
+                            <span className="text-center">합계</span>
+                          </div>
+                          {EVALUATORS.map((name) => {
+                            const s = evaluatorScores[name] || { pmScore: '', bonusScore: '' };
+                            const pm = Number(s.pmScore) || 0;
+                            const bonus = Number(s.bonusScore) || 0;
+                            const total = pm + bonus;
+                            return (
+                              <div key={name} className="grid grid-cols-[1fr,80px,80px,60px] gap-0 items-center px-3 py-1.5 border-b border-slate-800/50 hover:bg-slate-800/30">
+                                <span className="text-xs text-slate-300 font-medium">{name}</span>
+                                <input
+                                  type="number"
+                                  min="0" max="100"
+                                  value={s.pmScore}
+                                  onChange={(e) => setEvaluatorScores((prev) => ({
+                                    ...prev,
+                                    [name]: { ...prev[name], pmScore: e.target.value },
+                                  }))}
+                                  className="w-16 mx-auto px-2 py-1 rounded text-xs text-center bg-slate-800 border border-slate-600 text-slate-200 focus:border-purple-500 outline-none"
+                                  placeholder="0~100"
+                                />
+                                <input
+                                  type="number"
+                                  min="0" max="10"
+                                  value={s.bonusScore}
+                                  onChange={(e) => setEvaluatorScores((prev) => ({
+                                    ...prev,
+                                    [name]: { ...prev[name], bonusScore: e.target.value },
+                                  }))}
+                                  className="w-16 mx-auto px-2 py-1 rounded text-xs text-center bg-slate-800 border border-slate-600 text-slate-200 focus:border-purple-500 outline-none"
+                                  placeholder="0~10"
+                                />
+                                <span className={`text-xs font-bold text-center ${total >= 70 ? 'text-emerald-400' : total > 0 ? 'text-amber-400' : 'text-slate-600'}`}>
+                                  {s.pmScore !== '' ? total : '-'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* 협의 메모 */}
+                        <textarea
+                          value={consensusNotes}
+                          onChange={(e) => setConsensusNotes(e.target.value)}
+                          placeholder="평가위원 협의 메모 (선택사항)"
+                          className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-xs text-slate-200 placeholder-slate-600 focus:border-purple-500 outline-none resize-none"
+                          rows={2}
+                        />
+
+                        {/* 실시간 평균 계산 */}
+                        {(() => {
+                          const filled = Object.values(evaluatorScores).filter((v) => v.pmScore !== '' && v.pmScore !== null);
+                          if (filled.length === 0) return null;
+                          const avg = filled.reduce((sum, v) => sum + (Number(v.pmScore) || 0) + (Number(v.bonusScore) || 0), 0) / filled.length;
+                          return (
+                            <div className="flex items-center justify-between rounded-lg px-4 py-2.5 border"
+                              style={{ borderColor: avg >= 70 ? '#05966940' : '#dc262640', background: avg >= 70 ? 'rgba(5,150,105,0.1)' : 'rgba(220,38,38,0.1)' }}>
+                              <span className="text-xs text-slate-400">
+                                현재 평균 ({filled.length}명 입력):
+                              </span>
+                              <span className={`text-lg font-black ${avg >= 70 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {(Math.round(avg * 100) / 100).toFixed(1)}점
+                                <span className="text-[10px] ml-1 font-normal">{avg >= 70 ? '(합격선)' : '(불합격선)'}</span>
+                              </span>
+                            </div>
+                          );
+                        })()}
+
+                        <button
+                          onClick={handleSubmitScores}
+                          className="w-full py-3 rounded-xl text-sm font-bold text-white transition hover:opacity-90 active:scale-[0.98]"
+                          style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)' }}
+                        >
+                          🤝 평가 결과 확정 제출
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 제출 완료 결과 */}
+                    {scoringResult && (
+                      <div className="rounded-xl border p-4 text-center"
+                        style={{
+                          borderColor: scoringResult.passStatus === 'passed' ? '#059669' : '#dc2626',
+                          background: scoringResult.passStatus === 'passed' ? 'rgba(5,150,105,0.15)' : 'rgba(220,38,38,0.15)',
+                        }}>
+                        <p className="text-3xl mb-2">{scoringResult.passStatus === 'passed' ? '🎉' : '😞'}</p>
+                        <p className={`text-xl font-black ${scoringResult.passStatus === 'passed' ? 'text-emerald-300' : 'text-red-400'}`}>
+                          {scoringResult.passStatus === 'passed' ? '합격' : '불합격'}
+                        </p>
+                        <p className="text-2xl font-black text-white mt-1">{scoringResult.finalAverage.toFixed(1)}점</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {scoringResult.scores.length}명 평가위원 평균 · 합격기준 70점
+                        </p>
+                        <div className="mt-3 flex flex-wrap justify-center gap-2">
+                          {scoringResult.scores.map((s) => (
+                            <span key={s.evaluator} className="text-[10px] px-2 py-0.5 rounded-full border border-slate-600 bg-slate-800/60 text-slate-300">
+                              {s.evaluator}: {s.total}점
+                            </span>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => { setScoringResult(null); setScoringCandidateId(null); }}
+                          className="mt-3 text-xs text-purple-400 hover:text-purple-300 transition"
+                        >
+                          닫기
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 전체 결과 요약 */}
+                    {!scoringCandidateId && (
+                      <div className="text-center py-4 text-sm text-slate-500">
+                        위에서 피평가자를 선택하여 점수를 입력하세요
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ── 7단계: 최종 결과 발표 ── */}
+              <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#05966940', background: 'rgba(15,23,42,0.6)' }}>
+                <div
+                  className="px-5 py-3 flex items-center justify-between cursor-pointer"
+                  style={{ background: 'rgba(16,185,129,0.12)' }}
+                  onClick={() => setShowAnnouncementPanel(!showAnnouncementPanel)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">📢</span>
+                    <span className="text-sm font-bold text-emerald-300">7단계: 최종 결과 발표</span>
+                    <span className="text-[10px] text-emerald-500">3월 31일(화)</span>
+                  </div>
+                  <span className="text-xs text-emerald-400">{showAnnouncementPanel ? '△' : '▽'}</span>
+                </div>
+                {showAnnouncementPanel && (
+                  <div className="px-5 py-4 space-y-3">
+                    <div className="text-[10px] text-slate-500 mb-2">
+                      합격/불합격 여부만 공개 · 점수 비공개 · 개별 피드백 제공
+                    </div>
+                    {trackerSummary.map((cs) => {
+                      const stage6 = cs.record?.stage6 || {};
+                      const stage7 = cs.record?.stage7 || {};
+                      const hasResult = stage6.passStatus;
+                      const isAnnounced = stage7.status === 'completed';
+                      return (
+                        <div key={cs.candidateId} className="rounded-lg p-3 border border-slate-700/50 bg-slate-800/40">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black"
+                              style={{ background: 'linear-gradient(135deg, #065f46, #059669)', color: '#fff' }}>
+                              {cs.name.charAt(0)}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-bold text-slate-200">{cs.name}</p>
+                            </div>
+                            {hasResult && (
+                              <span className={`text-sm font-black px-3 py-1 rounded-lg ${
+                                stage6.passStatus === 'passed' ? 'bg-emerald-900/30 text-emerald-300 border border-emerald-700/50' :
+                                'bg-red-900/30 text-red-400 border border-red-700/50'
+                              }`}>
+                                {stage6.passStatus === 'passed' ? '합격' : '불합격'}
+                              </span>
+                            )}
+                            {!hasResult && (
+                              <span className="text-xs text-slate-600">6단계 미완료</span>
+                            )}
+                          </div>
+                          {hasResult && !isAnnounced && (
+                            <div className="flex gap-2 items-end">
+                              <input
+                                type="text"
+                                value={feedbackInputs[cs.candidateId] || ''}
+                                onChange={(e) => setFeedbackInputs((prev) => ({ ...prev, [cs.candidateId]: e.target.value }))}
+                                placeholder="개별 피드백 입력 (선택사항)"
+                                className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-slate-800 border border-slate-600 text-slate-200 placeholder-slate-600 focus:border-emerald-500 outline-none"
+                              />
+                              <button
+                                onClick={() => handleAnnounce(cs.candidateId)}
+                                className="text-[11px] px-4 py-1.5 rounded-lg font-bold border transition hover:opacity-80 whitespace-nowrap"
+                                style={{ borderColor: '#059669', color: '#6ee7b7', background: 'rgba(5,150,105,0.15)' }}
+                              >
+                                📢 발표
+                              </button>
+                            </div>
+                          )}
+                          {isAnnounced && (
+                            <div className="text-[10px] text-emerald-500 mt-1">
+                              ✅ 발표완료 ({new Date(stage7.announcedAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })})
+                              {stage7.feedback && <span className="text-slate-500 ml-2">피드백: {stage7.feedback}</span>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* ── 8단계: 인증서 수여식 ── */}
+              <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#d9770640', background: 'rgba(15,23,42,0.6)' }}>
+                <div
+                  className="px-5 py-3 flex items-center justify-between cursor-pointer"
+                  style={{ background: 'rgba(245,158,11,0.12)' }}
+                  onClick={() => setShowCertPanel(!showCertPanel)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🏆</span>
+                    <span className="text-sm font-bold text-amber-300">8단계: 인증서 수여식</span>
+                    <span className="text-[10px] text-amber-500">4월 TAG일 · 전사 행사</span>
+                  </div>
+                  <span className="text-xs text-amber-400">{showCertPanel ? '△' : '▽'}</span>
+                </div>
+                {showCertPanel && (
+                  <div className="px-5 py-4 space-y-3">
+                    {trackerSummary.map((cs) => {
+                      const stage6 = cs.record?.stage6 || {};
+                      const stage7 = cs.record?.stage7 || {};
+                      const stage8 = cs.record?.stage8 || {};
+                      const isPassed = stage6.passStatus === 'passed';
+                      const isAnnounced = stage7.status === 'completed';
+                      const isCertIssued = stage8.status === 'completed';
+                      return (
+                        <div key={cs.candidateId} className="flex items-center gap-3 rounded-lg p-3 border border-slate-700/50 bg-slate-800/40">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black"
+                            style={{ background: isPassed ? 'linear-gradient(135deg, #d97706, #f59e0b)' : '#374151', color: '#fff' }}>
+                            {cs.name.charAt(0)}
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-bold text-slate-200">{cs.name}</p>
+                            {isCertIssued ? (
+                              <p className="text-[10px] text-amber-400 font-mono">
+                                🏆 {stage8.certificateNumber} · 발급: {new Date(stage8.issuedAt).toLocaleDateString('ko-KR')}
+                              </p>
+                            ) : isPassed && isAnnounced ? (
+                              <p className="text-[10px] text-slate-500">합격자 · 인증서 미발급</p>
+                            ) : !isPassed && stage6.passStatus ? (
+                              <p className="text-[10px] text-red-500">불합격 · 인증서 대상 아님</p>
+                            ) : (
+                              <p className="text-[10px] text-slate-600">이전 단계 미완료</p>
+                            )}
+                          </div>
+                          {isPassed && isAnnounced && !isCertIssued && (
+                            <button
+                              onClick={() => handleIssueCert(cs.candidateId)}
+                              className="text-[11px] px-4 py-1.5 rounded-lg font-bold border transition hover:opacity-80"
+                              style={{ borderColor: '#d97706', color: '#fcd34d', background: 'rgba(217,119,6,0.15)' }}
+                            >
+                              🏆 인증서 발급
+                            </button>
+                          )}
+                          {isCertIssued && (
+                            <span className="text-[11px] font-bold text-amber-400">발급완료</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ═══ 치프인증 진행 일정 타임라인 ═══ */}
       {votingConfig.closed && (
         <div className="mt-8">
@@ -2751,7 +3241,7 @@ export default function QSResultsPage() {
       )}
 
       {/* 빌드 버전 (배포 검증용) */}
-      <p className="text-[10px] text-slate-600 text-center py-4">빌드: 2026-03-15-roulette</p>
+      <p className="text-[10px] text-slate-600 text-center py-4">빌드: 2026-03-15-stage5to8</p>
     </div>
   );
 }
