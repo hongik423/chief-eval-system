@@ -48,6 +48,8 @@ import {
   EVALUATORS,
 } from '@/lib/qsAssignmentStore';
 
+import { useStore } from '@/lib/store';
+
 const ALL_EVALUATORS = ['나동환', '권영도', '권오경', '김홍', '박성현', '윤덕상', '하상현'];
 const CATEGORY_KEYS = Object.keys(QS_CATEGORIES);
 const RESET_KEYWORD = '초기화하라';
@@ -152,6 +154,20 @@ export default function QSResultsPage() {
 
   // ── 8단계: 인증서 수여
   const [showCertPanel, setShowCertPanel] = useState(false);
+
+  // ── 상세 평가 데이터 연동 (store.js - Supabase 평가시스템)
+  const evalStoreInitialize = useStore(s => s.initialize);
+  const evalStoreLoading = useStore(s => s.loading);
+  const evalCandidates = useStore(s => s.candidates);
+  const evalEvaluators = useStore(s => s.evaluators);
+  const evalSessions = useStore(s => s.sessions);
+  const evalScores = useStore(s => s.scores);
+  const evalBonusScores = useStore(s => s.bonusScores);
+  const evalCriteriaSections = useStore(s => s.criteriaSections);
+  const evalCriteriaItems = useStore(s => s.criteriaItems);
+  const evalPeriodInfo = useStore(s => s.periodInfo);
+  const getCandidateResult = useStore(s => s.getCandidateResult);
+  const [evalInitialized, setEvalInitialized] = useState(false);
 
   // 최신 results를 interval 내부에서 안전하게 참조하기 위한 ref
   const resultsRef = useRef([]);
@@ -259,6 +275,15 @@ export default function QSResultsPage() {
     // votingConfig.closed는 내부에서 cfg로 직접 읽으므로 dependency 불필요
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefresh, fetchData]);
+
+  // ── 상세 평가 데이터 초기화 (Supabase에서 로드)
+  useEffect(() => {
+    if (!evalInitialized) {
+      evalStoreInitialize()
+        .then(() => setEvalInitialized(true))
+        .catch((err) => console.warn('[EvalStore] 초기화 실패 (무시):', err));
+    }
+  }, [evalInitialized, evalStoreInitialize]);
 
   // 카운트다운 타이머 - cleanup에 로컬 intervalId 사용(ref 경쟁조건 방지)
   useEffect(() => {
@@ -657,7 +682,7 @@ export default function QSResultsPage() {
       <div className="max-w-4xl mx-auto mt-16 text-center">
         <div className="text-5xl mb-4 animate-spin inline-block">⏳</div>
         <p className="text-slate-400">투표 결과를 불러오는 중...</p>
-        <p className="text-[10px] text-slate-600 mt-6">빌드: 2026-03-15-v2-public</p>
+        <p className="text-[10px] text-slate-600 mt-6">빌드: 2026-03-15-v3-eval-linked</p>
       </div>
     );
   }
@@ -2557,7 +2582,7 @@ export default function QSResultsPage() {
                 )}
               </div>
 
-              {/* ── 6단계: 평가위원 협의 (점수 입력) ── */}
+              {/* ── 6단계: 평가위원 협의 (상세 평가 데이터 연동) ── */}
               <div className="rounded-xl border overflow-hidden" style={{ borderColor: '#7c3aed40', background: 'rgba(15,23,42,0.6)' }}>
                 <div
                   className="px-5 py-3 flex items-center justify-between cursor-pointer"
@@ -2567,123 +2592,334 @@ export default function QSResultsPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-lg">🤝</span>
                     <span className="text-sm font-bold text-purple-300">6단계: 평가위원 협의</span>
-                    <span className="text-[10px] text-purple-500">합격기준: 평균 70점 이상</span>
+                    <span className="text-[10px] text-purple-500">합격기준: 평균 70점 이상 (PM역량 100점 + 가점 10점)</span>
                   </div>
                   <span className="text-xs text-purple-400">{showScoringPanel ? '△' : '▽'}</span>
                 </div>
                 {showScoringPanel && (
                   <div className="px-5 py-4 space-y-4">
+                    {/* 평가시스템 바로가기 링크 */}
+                    <div className="flex items-center gap-2 rounded-lg px-4 py-2.5 border border-purple-700/40 bg-purple-950/20">
+                      <span className="text-sm">📊</span>
+                      <span className="text-xs text-purple-300 flex-1">
+                        평가위원 평가표 입력은 <strong>평가시스템</strong>에서 진행됩니다.
+                      </span>
+                      <a
+                        href="/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] px-3 py-1.5 rounded-lg font-bold border transition hover:opacity-80"
+                        style={{ borderColor: '#7c3aed', color: '#c4b5fd', background: 'rgba(124,58,237,0.2)' }}
+                      >
+                        🔗 평가시스템 열기
+                      </a>
+                    </div>
+
+                    {/* 평가 기준 안내 */}
+                    <div className="rounded-lg border border-slate-700/40 bg-slate-900/50 px-4 py-3">
+                      <p className="text-[11px] font-bold text-purple-300 mb-2">📋 평가 기준표 (PM 역량평가 100점 + 가점 10점)</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {(evalCriteriaSections.length > 0 ? evalCriteriaSections : [
+                          { id: 'A', label: '세무사 협력 커뮤니케이션 역량', maxScore: 50, evalMethod: '인터뷰' },
+                          { id: 'B', label: '고객 솔루션 제안 커뮤니케이션 역량', maxScore: 30, evalMethod: 'PT' },
+                          { id: 'C', label: '프로젝트 설계 및 실무 역량', maxScore: 20, evalMethod: 'PT' },
+                        ]).map((sec) => (
+                          <div key={sec.id || sec.displayCode} className="rounded-lg px-3 py-2 border border-slate-700/30 bg-slate-800/40">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-black bg-purple-900/50 text-purple-300 border border-purple-700/40">
+                                {sec.displayCode || sec.id}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-300">{sec.label}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-slate-500">{sec.evalMethod}</span>
+                              <span className="text-xs font-black text-purple-400">{sec.maxScore}점</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* 피평가자 선택 탭 */}
                     <div className="flex gap-2">
                       {trackerSummary.map((cs) => {
+                        // 평가시스템(store.js)에서 실시간 데이터 조회
+                        const evalCandidate = evalCandidates.find(c => c.name === cs.name || c.id === cs.candidateId);
+                        const candidateResult = evalCandidate ? getCandidateResult(evalCandidate.id) : null;
                         const stage6 = cs.record?.stage6 || {};
                         const isDone = stage6.status === 'completed';
+                        const hasEvalData = candidateResult && candidateResult.evalCount > 0;
+
                         return (
                           <button
                             key={cs.candidateId}
-                            onClick={() => handleOpenScoring(cs.candidateId)}
+                            onClick={() => {
+                              setScoringCandidateId(cs.candidateId);
+                              setScoringResult(null);
+                              setShowScoringPanel(true);
+                            }}
                             className={`flex-1 py-2 rounded-lg text-xs font-bold border transition ${
                               scoringCandidateId === cs.candidateId
                                 ? 'border-purple-500 bg-purple-900/40 text-purple-200'
                                 : isDone
                                 ? 'border-emerald-700 bg-emerald-900/20 text-emerald-400'
+                                : hasEvalData
+                                ? 'border-blue-600 bg-blue-900/20 text-blue-300'
                                 : 'border-slate-600 bg-slate-800 text-slate-400 hover:border-slate-500'
                             }`}
                           >
-                            {isDone ? '✅ ' : ''}{cs.name}
-                            {isDone && ` (${stage6.finalAverage}점)`}
+                            {isDone ? '✅ ' : hasEvalData ? '📊 ' : ''}{cs.name}
+                            {isDone && stage6.finalAverage ? ` (${stage6.finalAverage}점)` : ''}
+                            {!isDone && hasEvalData ? ` (${candidateResult.evalCount}명 평가)` : ''}
                           </button>
                         );
                       })}
                     </div>
 
-                    {/* 점수 입력 폼 */}
-                    {scoringCandidateId && !scoringResult && (
-                      <div className="space-y-3">
-                        <div className="rounded-lg border border-slate-700/50 overflow-hidden">
-                          <div className="grid grid-cols-[1fr,80px,80px,60px] gap-0 text-[10px] font-bold text-slate-400 px-3 py-2 border-b border-slate-700/50 bg-slate-800/60">
-                            <span>평가위원</span>
-                            <span className="text-center">PM역량 (100)</span>
-                            <span className="text-center">가점 (10)</span>
-                            <span className="text-center">합계</span>
+                    {/* 선택된 피평가자 상세 평가 결과 */}
+                    {scoringCandidateId && (() => {
+                      const cs = trackerSummary.find(t => t.candidateId === scoringCandidateId);
+                      const evalCandidate = evalCandidates.find(c => c.name === cs?.name || c.id === scoringCandidateId);
+                      const candidateResult = evalCandidate ? getCandidateResult(evalCandidate.id) : null;
+                      const stage6 = cs?.record?.stage6 || {};
+                      const isDone = stage6.status === 'completed';
+
+                      if (evalStoreLoading) {
+                        return (
+                          <div className="text-center py-6">
+                            <div className="inline-block w-6 h-6 border-2 border-purple-400 border-t-transparent rounded-full animate-spin mb-2" />
+                            <p className="text-xs text-slate-500">평가 데이터 로딩중...</p>
                           </div>
-                          {EVALUATORS.map((name) => {
-                            const s = evaluatorScores[name] || { pmScore: '', bonusScore: '' };
-                            const pm = Number(s.pmScore) || 0;
-                            const bonus = Number(s.bonusScore) || 0;
-                            const total = pm + bonus;
-                            return (
-                              <div key={name} className="grid grid-cols-[1fr,80px,80px,60px] gap-0 items-center px-3 py-1.5 border-b border-slate-800/50 hover:bg-slate-800/30">
-                                <span className="text-xs text-slate-300 font-medium">{name}</span>
-                                <input
-                                  type="number"
-                                  min="0" max="100"
-                                  value={s.pmScore}
-                                  onChange={(e) => setEvaluatorScores((prev) => ({
-                                    ...prev,
-                                    [name]: { ...prev[name], pmScore: e.target.value },
-                                  }))}
-                                  className="w-16 mx-auto px-2 py-1 rounded text-xs text-center bg-slate-800 border border-slate-600 text-slate-200 focus:border-purple-500 outline-none"
-                                  placeholder="0~100"
-                                />
-                                <input
-                                  type="number"
-                                  min="0" max="10"
-                                  value={s.bonusScore}
-                                  onChange={(e) => setEvaluatorScores((prev) => ({
-                                    ...prev,
-                                    [name]: { ...prev[name], bonusScore: e.target.value },
-                                  }))}
-                                  className="w-16 mx-auto px-2 py-1 rounded text-xs text-center bg-slate-800 border border-slate-600 text-slate-200 focus:border-purple-500 outline-none"
-                                  placeholder="0~10"
-                                />
-                                <span className={`text-xs font-bold text-center ${total >= 70 ? 'text-emerald-400' : total > 0 ? 'text-amber-400' : 'text-slate-600'}`}>
-                                  {s.pmScore !== '' ? total : '-'}
-                                </span>
+                        );
+                      }
+
+                      if (!candidateResult || candidateResult.evalCount === 0) {
+                        return (
+                          <div className="rounded-xl border border-slate-700/40 bg-slate-900/50 p-5 text-center">
+                            <p className="text-3xl mb-2">📝</p>
+                            <p className="text-sm font-bold text-slate-300 mb-1">{cs?.name} - 평가 데이터 없음</p>
+                            <p className="text-xs text-slate-500 mb-3">
+                              아직 평가위원이 평가를 완료하지 않았습니다.<br/>
+                              평가시스템에서 평가를 진행해 주세요.
+                            </p>
+                            <a
+                              href="/"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block text-[11px] px-4 py-2 rounded-lg font-bold border transition hover:opacity-80"
+                              style={{ borderColor: '#7c3aed', color: '#c4b5fd', background: 'rgba(124,58,237,0.2)' }}
+                            >
+                              🔗 평가시스템에서 평가하기
+                            </a>
+
+                            {/* 수동 입력 폴백 (관리자용) */}
+                            {adminMode && !isDone && (
+                              <div className="mt-4 pt-4 border-t border-slate-700/40">
+                                <p className="text-[10px] text-slate-600 mb-2">관리자 수동 입력 (Supabase 미연동 시)</p>
+                                <div className="rounded-lg border border-slate-700/50 overflow-hidden">
+                                  <div className="grid grid-cols-[1fr,80px,80px,60px] gap-0 text-[10px] font-bold text-slate-400 px-3 py-2 border-b border-slate-700/50 bg-slate-800/60">
+                                    <span>평가위원</span>
+                                    <span className="text-center">PM역량 (100)</span>
+                                    <span className="text-center">가점 (10)</span>
+                                    <span className="text-center">합계</span>
+                                  </div>
+                                  {EVALUATORS.map((name) => {
+                                    const s = evaluatorScores[name] || { pmScore: '', bonusScore: '' };
+                                    const pm = Number(s.pmScore) || 0;
+                                    const bonus = Number(s.bonusScore) || 0;
+                                    const total = pm + bonus;
+                                    return (
+                                      <div key={name} className="grid grid-cols-[1fr,80px,80px,60px] gap-0 items-center px-3 py-1.5 border-b border-slate-800/50 hover:bg-slate-800/30">
+                                        <span className="text-xs text-slate-300 font-medium">{name}</span>
+                                        <input type="number" min="0" max="100" value={s.pmScore}
+                                          onChange={(e) => setEvaluatorScores(prev => ({ ...prev, [name]: { ...prev[name], pmScore: e.target.value } }))}
+                                          className="w-16 mx-auto px-2 py-1 rounded text-xs text-center bg-slate-800 border border-slate-600 text-slate-200 focus:border-purple-500 outline-none" placeholder="0~100" />
+                                        <input type="number" min="0" max="10" value={s.bonusScore}
+                                          onChange={(e) => setEvaluatorScores(prev => ({ ...prev, [name]: { ...prev[name], bonusScore: e.target.value } }))}
+                                          className="w-16 mx-auto px-2 py-1 rounded text-xs text-center bg-slate-800 border border-slate-600 text-slate-200 focus:border-purple-500 outline-none" placeholder="0~10" />
+                                        <span className={`text-xs font-bold text-center ${total >= 70 ? 'text-emerald-400' : total > 0 ? 'text-amber-400' : 'text-slate-600'}`}>
+                                          {s.pmScore !== '' ? total : '-'}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <button onClick={handleSubmitScores}
+                                  className="w-full mt-2 py-2 rounded-lg text-[11px] font-bold text-white transition hover:opacity-90"
+                                  style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)' }}>
+                                  수동 점수 제출
+                                </button>
                               </div>
-                            );
-                          })}
-                        </div>
+                            )}
+                          </div>
+                        );
+                      }
 
-                        {/* 협의 메모 */}
-                        <textarea
-                          value={consensusNotes}
-                          onChange={(e) => setConsensusNotes(e.target.value)}
-                          placeholder="평가위원 협의 메모 (선택사항)"
-                          className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-xs text-slate-200 placeholder-slate-600 focus:border-purple-500 outline-none resize-none"
-                          rows={2}
-                        />
+                      // ── 평가 데이터가 있는 경우: 상세 점수 표시 ──
+                      const sections = evalCriteriaSections.length > 0 ? evalCriteriaSections : [
+                        { id: 'A', displayCode: 'A', label: '세무사 협력 커뮤니케이션 역량', maxScore: 50 },
+                        { id: 'B', displayCode: 'B', label: '고객 솔루션 제안 커뮤니케이션 역량', maxScore: 30 },
+                        { id: 'C', displayCode: 'C', label: '프로젝트 설계 및 실무 역량', maxScore: 20 },
+                      ];
+                      const passScore = evalPeriodInfo?.passScore ?? 70;
 
-                        {/* 실시간 평균 계산 */}
-                        {(() => {
-                          const filled = Object.values(evaluatorScores).filter((v) => v.pmScore !== '' && v.pmScore !== null);
-                          if (filled.length === 0) return null;
-                          const avg = filled.reduce((sum, v) => sum + (Number(v.pmScore) || 0) + (Number(v.bonusScore) || 0), 0) / filled.length;
-                          return (
-                            <div className="flex items-center justify-between rounded-lg px-4 py-2.5 border"
-                              style={{ borderColor: avg >= 70 ? '#05966940' : '#dc262640', background: avg >= 70 ? 'rgba(5,150,105,0.1)' : 'rgba(220,38,38,0.1)' }}>
-                              <span className="text-xs text-slate-400">
-                                현재 평균 ({filled.length}명 입력):
-                              </span>
-                              <span className={`text-lg font-black ${avg >= 70 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                {(Math.round(avg * 100) / 100).toFixed(1)}점
-                                <span className="text-[10px] ml-1 font-normal">{avg >= 70 ? '(합격선)' : '(불합격선)'}</span>
-                              </span>
+                      return (
+                        <div className="space-y-3">
+                          {/* 평가 결과 요약 카드 */}
+                          <div className="rounded-xl border p-4"
+                            style={{
+                              borderColor: candidateResult.pass === true ? '#059669' : candidateResult.pass === false ? '#dc2626' : '#7c3aed40',
+                              background: candidateResult.pass === true ? 'rgba(5,150,105,0.1)' : candidateResult.pass === false ? 'rgba(220,38,38,0.1)' : 'rgba(124,58,237,0.05)',
+                            }}>
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <p className="text-sm font-bold text-slate-200">{cs?.name} 평가 결과</p>
+                                <p className="text-[10px] text-slate-500">{candidateResult.evalCount}명 평가완료 / 가점: {candidateResult.bonus}점</p>
+                              </div>
+                              <div className="text-right">
+                                <p className={`text-2xl font-black ${
+                                  candidateResult.pass === true ? 'text-emerald-400' : candidateResult.pass === false ? 'text-red-400' : 'text-purple-300'
+                                }`}>
+                                  {candidateResult.finalAvg !== null ? candidateResult.finalAvg.toFixed(1) : '-'}점
+                                </p>
+                                <p className={`text-xs font-bold ${
+                                  candidateResult.pass === true ? 'text-emerald-500' : candidateResult.pass === false ? 'text-red-500' : 'text-slate-500'
+                                }`}>
+                                  {candidateResult.pass === true ? '✅ 합격' : candidateResult.pass === false ? '❌ 불합격' : '평가 진행중'}
+                                  <span className="text-[10px] text-slate-600 font-normal ml-1">(기준: {passScore}점)</span>
+                                </p>
+                              </div>
                             </div>
-                          );
-                        })()}
 
-                        <button
-                          onClick={handleSubmitScores}
-                          className="w-full py-3 rounded-xl text-sm font-bold text-white transition hover:opacity-90 active:scale-[0.98]"
-                          style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)' }}
-                        >
-                          🤝 평가 결과 확정 제출
-                        </button>
-                      </div>
-                    )}
+                            {/* 산식 표시 */}
+                            <div className="rounded-lg px-3 py-2 bg-slate-800/60 border border-slate-700/30 text-[10px] text-slate-400">
+                              평균 = (평가총점수 {candidateResult.totalSum}점 + 가점 {candidateResult.bonus}점) ÷ 평가위원수 {candidateResult.evalCount}명 = <strong className="text-white">{candidateResult.finalAvg !== null ? candidateResult.finalAvg.toFixed(2) : '-'}점</strong>
+                            </div>
+                          </div>
 
-                    {/* 제출 완료 결과 */}
+                          {/* 평가위원별 상세 점수 테이블 */}
+                          <div className="rounded-lg border border-slate-700/50 overflow-hidden">
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-[11px]">
+                                <thead>
+                                  <tr className="bg-slate-800/60 border-b border-slate-700/50">
+                                    <th className="text-left px-3 py-2 text-slate-400 font-bold">평가위원</th>
+                                    {sections.map((sec) => (
+                                      <th key={sec.id} className="text-center px-2 py-2 text-slate-400 font-bold whitespace-nowrap">
+                                        {sec.displayCode || sec.id} ({sec.maxScore})
+                                      </th>
+                                    ))}
+                                    <th className="text-center px-2 py-2 text-purple-400 font-bold">합계 (100)</th>
+                                    <th className="text-center px-2 py-2 text-slate-400 font-bold">상태</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {candidateResult.evaluatorDetails.map((detail) => {
+                                    const isExcl = detail.isSameTeam;
+                                    return (
+                                      <tr key={detail.evaluator.id}
+                                        className={`border-b border-slate-800/50 ${isExcl ? 'opacity-40' : 'hover:bg-slate-800/30'}`}>
+                                        <td className="px-3 py-2 text-slate-300 font-medium whitespace-nowrap">
+                                          {detail.evaluator.name}
+                                          {isExcl && <span className="text-[9px] text-red-400 ml-1">(제외)</span>}
+                                        </td>
+                                        {sections.map((sec) => (
+                                          <td key={sec.id} className="text-center px-2 py-2 text-slate-300 font-mono">
+                                            {detail.isComplete ? (detail.sectionBreakdown[sec.id] || 0) : '-'}
+                                          </td>
+                                        ))}
+                                        <td className={`text-center px-2 py-2 font-bold font-mono ${
+                                          detail.isComplete
+                                            ? detail.totalScore >= 70 ? 'text-emerald-400' : 'text-amber-400'
+                                            : 'text-slate-600'
+                                        }`}>
+                                          {detail.isComplete ? detail.totalScore : '-'}
+                                        </td>
+                                        <td className="text-center px-2 py-2">
+                                          {detail.isComplete ? (
+                                            <span className="text-emerald-500 text-[10px]">✅</span>
+                                          ) : isExcl ? (
+                                            <span className="text-red-400 text-[10px]">제외</span>
+                                          ) : (
+                                            <span className="text-amber-500 text-[10px]">진행중</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                  {/* 가점 행 */}
+                                  <tr className="bg-purple-900/20 border-t border-purple-700/30">
+                                    <td className="px-3 py-2 text-purple-300 font-bold" colSpan={sections.length + 1}>
+                                      가점 (코치 부여)
+                                    </td>
+                                    <td className="text-center px-2 py-2 text-purple-300 font-black font-mono">
+                                      +{candidateResult.bonus}
+                                    </td>
+                                    <td className="text-center px-2 py-2 text-[10px] text-purple-400">
+                                      /10점
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
+                          {/* 협의 메모 */}
+                          <textarea
+                            value={consensusNotes}
+                            onChange={(e) => setConsensusNotes(e.target.value)}
+                            placeholder="평가위원 협의 메모 (선택사항)"
+                            className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-xs text-slate-200 placeholder-slate-600 focus:border-purple-500 outline-none resize-none"
+                            rows={2}
+                          />
+
+                          {/* 결과 확정 버튼 (관리자용) */}
+                          {adminMode && !isDone && candidateResult.evalCount > 0 && (
+                            <button
+                              onClick={() => {
+                                try {
+                                  // store.js 데이터를 기반으로 submitEvaluatorScores 호출
+                                  const storeScores = candidateResult.evaluatorDetails
+                                    .filter(d => !d.isSameTeam && d.isComplete)
+                                    .map(d => ({
+                                      evaluator: d.evaluator.name,
+                                      pmScore: d.totalScore,
+                                      bonusScore: candidateResult.bonus,
+                                    }));
+                                  const result = submitEvaluatorScores(scoringCandidateId, storeScores, consensusNotes);
+                                  setScoringResult(result);
+                                  setTrackerSummary(getCandidateTrackerSummary());
+                                } catch (err) {
+                                  alert('결과 확정 오류: ' + err.message);
+                                }
+                              }}
+                              className="w-full py-3 rounded-xl text-sm font-bold text-white transition hover:opacity-90 active:scale-[0.98]"
+                              style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)' }}
+                            >
+                              🤝 평가 결과 확정 (평균 {candidateResult.finalAvg?.toFixed(1)}점 → {candidateResult.pass ? '합격' : '불합격'})
+                            </button>
+                          )}
+
+                          {/* 이미 확정된 경우 */}
+                          {isDone && (
+                            <div className="rounded-xl border p-4 text-center"
+                              style={{
+                                borderColor: stage6.passStatus === 'passed' ? '#059669' : '#dc2626',
+                                background: stage6.passStatus === 'passed' ? 'rgba(5,150,105,0.15)' : 'rgba(220,38,38,0.15)',
+                              }}>
+                              <p className="text-sm font-bold text-slate-300">
+                                ✅ 결과 확정됨 — {stage6.passStatus === 'passed' ? '합격' : '불합격'} ({stage6.finalAverage}점)
+                              </p>
+                              <p className="text-[10px] text-slate-500 mt-1">
+                                확정일: {stage6.decidedAt ? new Date(stage6.decidedAt).toLocaleString('ko-KR') : '-'}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* 제출 완료 결과 팝업 */}
                     {scoringResult && (
                       <div className="rounded-xl border p-4 text-center"
                         style={{
@@ -2714,10 +2950,10 @@ export default function QSResultsPage() {
                       </div>
                     )}
 
-                    {/* 전체 결과 요약 */}
+                    {/* 피평가자 미선택 시 안내 */}
                     {!scoringCandidateId && (
                       <div className="text-center py-4 text-sm text-slate-500">
-                        위에서 피평가자를 선택하여 점수를 입력하세요
+                        위에서 피평가자를 선택하여 평가 결과를 확인하세요
                       </div>
                     )}
                   </div>
@@ -3241,7 +3477,7 @@ export default function QSResultsPage() {
       )}
 
       {/* 빌드 버전 (배포 검증용) */}
-      <p className="text-[10px] text-slate-600 text-center py-4">빌드: 2026-03-15-v2-public</p>
+      <p className="text-[10px] text-slate-600 text-center py-4">빌드: 2026-03-15-v3-eval-linked</p>
     </div>
   );
 }

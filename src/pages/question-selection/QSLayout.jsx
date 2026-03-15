@@ -50,7 +50,7 @@ export default function QSLayout() {
       <footer className="bg-slate-900 border-t border-slate-700 mt-auto">
         <div className="max-w-7xl mx-auto px-4 py-4 text-center text-xs text-slate-500">
           © 2026 기업의별 ASSO 치프인증제도 | 1차 출제 마감 완료 (2026.02.26)
-          <span className="block mt-1">빌드: 2026-03-15-v2-public</span>
+          <span className="block mt-1">빌드: 2026-03-15-v3-eval-linked</span>
         </div>
       </footer>
     </div>
