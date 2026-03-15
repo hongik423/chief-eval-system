@@ -28,8 +28,8 @@ export default function QSLayout() {
           </button>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs bg-amber-900/40 text-amber-400 px-3 py-1 rounded-full font-medium border border-amber-700/50">
-              2026년 1차 출제
+            <span className="text-xs bg-emerald-900/40 text-emerald-400 px-3 py-1 rounded-full font-medium border border-emerald-700/50">
+              ✅ 1차 출제 마감
             </span>
             <button
               onClick={() => navigate('/question-selection/results')}
@@ -49,7 +49,7 @@ export default function QSLayout() {
       {/* 푸터 */}
       <footer className="bg-slate-900 border-t border-slate-700 mt-auto">
         <div className="max-w-7xl mx-auto px-4 py-4 text-center text-xs text-slate-500">
-          © 2026 기업의별 ASSO 치프인증제도 | TEST RED 30일 전 1차 출제 시스템
+          © 2026 기업의별 ASSO 치프인증제도 | 1차 출제 마감 완료 (2026.02.26)
         </div>
       </footer>
     </div>

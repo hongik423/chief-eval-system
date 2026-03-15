@@ -8,8 +8,29 @@ import { supabase } from '@/lib/supabase';
 
 const CONFIG_KEY = 'qs_voting_config';
 
+// ──────────────────────────────────────────────────────────────
+// 1차 출제 마감 설정 (2026-02-26 출제 마감 확정)
+// 최종 9문제 확정 결과를 하드코딩하여 모든 브라우저에서 동일하게 적용
+// ──────────────────────────────────────────────────────────────
+const ROUND_1_CLOSED = true;
+const ROUND_1_CLOSED_AT = '2026-02-26T12:00:00.000+09:00';
+const ROUND_1_FINAL_QUESTIONS = {
+  stock_transfer:    [4, 5, 12], // 주식 이동: #4(4표) #5(4표) #12(3표)
+  nominee_stock:     [3, 1, 10], // 차명 주식: #3(5표) #1(3표) #10(3표)
+  temporary_payment: [6, 11, 2], // 가지급금:  #6(4표) #11(4표) #2(3표)
+};
+
 // 투표 설정 조회 (localStorage)
+// ※ ROUND_1_CLOSED=true 이면 localStorage 무시하고 확정값 반환
 export function getVotingConfig() {
+  if (ROUND_1_CLOSED) {
+    return {
+      closed: true,
+      finalQuestions: ROUND_1_FINAL_QUESTIONS,
+      closedAt: ROUND_1_CLOSED_AT,
+      scheduledCloseAt: null,
+    };
+  }
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
     return raw

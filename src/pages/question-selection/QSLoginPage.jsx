@@ -8,6 +8,7 @@ import {
   hasCustomPassword,
 } from '@/data/qsEvaluators';
 import { QS_PDF_URL } from '@/data/qsQuestions';
+import { getVotingConfig } from '@/lib/qsVoteStore';
 
 const DEADLINE = new Date('2026-02-26T12:00:00');
 
@@ -479,24 +480,18 @@ export default function QSLoginPage() {
           <p className="text-stone-700 text-xs mt-1">각 분야별 3문제 선택 → 최다득표 순 최종 3문제 확정</p>
         </div>
 
-        {/* 마감 D-day 배너 */}
-        <div className="px-6 py-3 flex items-center gap-3 border-b border-red-900/40"
-          style={{ background: 'linear-gradient(135deg, #1c0606 0%, #2a0808 100%)' }}>
-          <span className="text-lg">⏰</span>
+        {/* 마감 완료 배너 */}
+        <div className="px-6 py-4 flex items-center gap-3 border-b border-emerald-900/40"
+          style={{ background: 'linear-gradient(135deg, #022c22 0%, #064e3b 100%)' }}>
+          <span className="text-2xl">✅</span>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-red-300">마감: 2월 26일(목) 오전 12시</p>
-            <p className="text-xs text-red-500/80">오후 인증후보자 출제 고지 예정</p>
+            <p className="text-sm font-bold text-emerald-300">1차 출제 투표 마감 완료</p>
+            <p className="text-xs text-emerald-600">2026년 2월 26일(목) 오전 12시 · 최종 9문제 확정</p>
           </div>
-          {deadlineText && (
-            <div className="text-right flex-shrink-0">
-              <p className="text-xs text-red-500">남은 시간</p>
-              <p className="text-sm font-bold text-red-300 tabular-nums">{deadlineText}</p>
-            </div>
-          )}
-          <button onClick={() => setShowNotice(true)}
-            className="text-xs border px-2 py-1 rounded-lg transition flex-shrink-0"
-            style={{ color: 'rgb(214,173,101)', borderColor: 'rgb(120,80,20)' }}>
-            공지 재확인
+          <button onClick={() => navigate('/question-selection/results')}
+            className="text-xs font-bold border px-3 py-1.5 rounded-lg transition flex-shrink-0 hover:bg-emerald-900/40"
+            style={{ color: '#6ee7b7', borderColor: '#065f46' }}>
+            📊 결과 보기
           </button>
         </div>
 
@@ -620,15 +615,22 @@ export default function QSLoginPage() {
             </div>
           )}
 
-          {/* 로그인 버튼 */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-4 rounded-lg font-bold text-base transition-all shadow-lg disabled:opacity-50 hover:opacity-90 text-stone-900"
-            style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
-          >
-            {loading ? '확인 중...' : '🗳️ 문제 선정 투표 시작'}
-          </button>
+          {/* 로그인 버튼 - 마감 후 비활성화 */}
+          {getVotingConfig().closed ? (
+            <div className="w-full py-4 rounded-lg font-bold text-base text-center border"
+              style={{ background: '#022c22', borderColor: '#065f46', color: '#6ee7b7' }}>
+              ✅ 투표가 마감되었습니다
+            </div>
+          ) : (
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 rounded-lg font-bold text-base transition-all shadow-lg disabled:opacity-50 hover:opacity-90 text-stone-900"
+              style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
+            >
+              {loading ? '확인 중...' : '🗳️ 문제 선정 투표 시작'}
+            </button>
+          )}
         </form>
 
         {/* 하단 링크 */}

@@ -12,6 +12,21 @@ import {
   clearScheduledClose,
   resetAllVotes,
 } from '@/lib/qsVoteStore';
+import {
+  ROUND2_CANDIDATES,
+  ROUND2_QUESTION_POOL,
+  generateRandomAssignments,
+  encodeToken,
+  loadAssignmentsLocal,
+  saveAssignmentsLocal,
+  clearAssignmentsLocal,
+  EXAM_DATE_STR,
+  SCHEDULE_MILESTONES,
+  getCurrentStep,
+  ROUND2_DATE_STR,
+  MENTORING_START,
+  MENTORING_END,
+} from '@/lib/qsAssignmentStore';
 
 const ALL_EVALUATORS = ['나동환', '권영도', '권오경', '김홍', '박성현', '윤덕상', '하상현'];
 const CATEGORY_KEYS = Object.keys(QS_CATEGORIES);
@@ -72,6 +87,15 @@ export default function QSResultsPage() {
   const [resetTexts, setResetTexts] = useState(['', '', '']);
   const [resetError, setResetError] = useState('');
 
+  // ── 2차 출제 랜덤 배정
+  const [assignments, setAssignments] = useState([]); // 현재 배정 목록
+  const [assignSavedAt, setAssignSavedAt] = useState(null);
+  const [copiedToken, setCopiedToken] = useState(''); // 복사된 토큰 키
+  const [testMode, setTestMode] = useState(false); // 테스트 시뮬레이션 모드
+  const [testAssignments, setTestAssignments] = useState([]); // 테스트 배정 결과
+  const [isSpinning, setIsSpinning] = useState(false); // 랜덤 배정 애니메이션
+  const [spinStep, setSpinStep] = useState(0); // 애니메이션 단계 (0~3)
+
   // 최신 results를 interval 내부에서 안전하게 참조하기 위한 ref
   const resultsRef = useRef([]);
 
@@ -93,6 +117,12 @@ export default function QSResultsPage() {
   useEffect(() => {
     fetchData();
     setVotingConfig(getVotingConfig());
+    // 저장된 2차 배정 로드
+    const saved = loadAssignmentsLocal();
+    if (saved) {
+      setAssignments(saved.assignments || []);
+      setAssignSavedAt(saved.savedAt);
+    }
   }, [fetchData]);
 
   useEffect(() => {
@@ -253,6 +283,62 @@ export default function QSResultsPage() {
     clearScheduledClose();
     setVotingConfig(getVotingConfig());
     setScheduleInput('');
+  };
+
+  // ── 2차 출제 랜덤 배정 실행 (슬롯머신 애니메이션 포함)
+  const runSpinAnimation = (callback) => {
+    setIsSpinning(true);
+    setSpinStep(0);
+    // 3단계 애니메이션: 분야1 → 분야2 → 분야3 → 완료
+    const steps = [1, 2, 3];
+    steps.forEach((step, idx) => {
+      setTimeout(() => {
+        setSpinStep(step);
+        if (idx === steps.length - 1) {
+          setTimeout(() => {
+            setIsSpinning(false);
+            setSpinStep(0);
+            callback();
+          }, 600);
+        }
+      }, (idx + 1) * 500);
+    });
+  };
+
+  const handleRunAssignment = () => {
+    runSpinAnimation(() => {
+      const result = generateRandomAssignments(true);
+      saveAssignmentsLocal(result);
+      setAssignments(result);
+      setAssignSavedAt(new Date().toISOString());
+      setTestMode(false);
+      setTestAssignments([]);
+    });
+  };
+
+  // ── 테스트 시뮬레이션 실행 (저장하지 않음)
+  const handleTestAssignment = () => {
+    runSpinAnimation(() => {
+      const result = generateRandomAssignments(true);
+      setTestAssignments(result);
+    });
+  };
+
+  // ── 2차 배정 초기화
+  const handleClearAssignment = () => {
+    clearAssignmentsLocal();
+    setAssignments([]);
+    setAssignSavedAt(null);
+  };
+
+  // ── URL 복사
+  const handleCopyUrl = async (token) => {
+    const url = `${window.location.origin}/question-selection/exam/${token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedToken(token);
+      setTimeout(() => setCopiedToken(''), 2500);
+    } catch { /* ignore */ }
   };
 
   // 편집 모드 시작
@@ -1025,6 +1111,436 @@ export default function QSResultsPage() {
           >
             투표 페이지로 이동 →
           </button>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════
+          2차 출제 랜덤 배정 섹션
+      ════════════════════════════════════════════════════════ */}
+      {votingConfig.closed && (
+        <div className="mt-8">
+          {/* 섹션 헤더 */}
+          <div
+            className="rounded-2xl overflow-hidden border-2 shadow-2xl"
+            style={{ borderColor: 'rgb(214,173,101)', background: 'linear-gradient(135deg, #1a1207 0%, #292010 100%)' }}
+          >
+            {/* 골드 타이틀 바 */}
+            <div
+              className="px-6 py-5 flex items-center justify-between"
+              style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">🎲</span>
+                <div>
+                  <h2 className="text-lg font-black text-stone-900">2차 출제 랜덤 배정기</h2>
+                  <p className="text-xs text-stone-700 font-medium">
+                    인증 후보자 3명 × 분야별 1문제 = 총 3문제 랜덤 배정 · 개인 URL 발급
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-stone-700 font-medium">시험일</p>
+                <p className="text-sm font-black text-stone-900">{EXAM_DATE_STR}</p>
+              </div>
+            </div>
+
+            {/* 문제 풀 요약 */}
+            <div className="px-6 py-4 border-b border-amber-900/30">
+              <p className="text-xs font-bold text-amber-500 mb-3">
+                🎯 배정 문제 풀 (1차 최종 확정 9문제)
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { key: 'stock_transfer',    icon: '📊', label: '주식이동',  color: 'text-blue-400',    bg: 'bg-blue-900/20',    border: 'border-blue-800/50' },
+                  { key: 'nominee_stock',     icon: '🔐', label: '차명주식',  color: 'text-purple-400',  bg: 'bg-purple-900/20',  border: 'border-purple-800/50' },
+                  { key: 'temporary_payment', icon: '💰', label: '가지급금',  color: 'text-emerald-400', bg: 'bg-emerald-900/20', border: 'border-emerald-800/50' },
+                ].map(({ key, icon, label, color, bg, border }) => (
+                  <div key={key} className={`rounded-xl p-3 border ${border} ${bg}`}>
+                    <p className={`text-xs font-bold ${color} mb-2`}>{icon} {label}</p>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {ROUND2_QUESTION_POOL[key].map(qId => {
+                        const q = QS_QUESTIONS[qId];
+                        return (
+                          <div key={qId} className="bg-slate-700/60 rounded-lg px-2 py-1 text-center">
+                            <span className={`text-xs font-black ${color}`}>#{qId}</span>
+                            <p className="text-[9px] text-slate-500 leading-tight mt-0.5 max-w-[70px] truncate">
+                              {q?.title?.split(' - ')[0] || ''}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 배정 실행 / 결과 영역 */}
+            <div className="px-6 py-5">
+
+              {/* ── 슬롯머신 애니메이션 ── */}
+              {isSpinning && (
+                <div className="mb-5">
+                  <div className="rounded-2xl border border-amber-700/50 overflow-hidden" style={{ background: 'rgba(30,20,5,0.8)' }}>
+                    <div className="px-5 py-4 text-center">
+                      <p className="text-sm font-bold text-amber-400 mb-4 animate-pulse">🎰 랜덤 배정 추첨 진행중...</p>
+                      <div className="grid grid-cols-3 gap-3">
+                        {[
+                          { label: '주식이동', color: '#3b82f6', icon: '📊' },
+                          { label: '차명주식', color: '#8b5cf6', icon: '🔐' },
+                          { label: '가지급금', color: '#10b981', icon: '💰' },
+                        ].map(({ label, color, icon }, idx) => (
+                          <div
+                            key={label}
+                            className="rounded-xl p-4 border-2 text-center transition-all duration-300"
+                            style={{
+                              borderColor: spinStep > idx ? color : '#374151',
+                              background: spinStep > idx ? `${color}15` : 'rgba(15,23,42,0.6)',
+                              transform: spinStep === idx + 1 ? 'scale(1.05)' : 'scale(1)',
+                            }}
+                          >
+                            <span className="text-2xl block mb-1">{icon}</span>
+                            <p className="text-xs font-bold mb-2" style={{ color: spinStep > idx ? color : '#64748b' }}>{label}</p>
+                            <div
+                              className="text-2xl font-black transition-all duration-300"
+                              style={{ color: spinStep > idx ? color : '#475569' }}
+                            >
+                              {spinStep > idx ? '✓' : spinStep === idx + 1 ? (
+                                <span className="animate-bounce inline-block">?</span>
+                              ) : '—'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── 실행 버튼 영역 ── */}
+              <div className="flex items-center gap-3 mb-5 flex-wrap">
+                {/* 테스트 시뮬레이션 버튼 (항상 표시) */}
+                <button
+                  onClick={handleTestAssignment}
+                  disabled={isSpinning}
+                  className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm transition hover:opacity-90 shadow-lg active:scale-95 border-2 disabled:opacity-50"
+                  style={{
+                    background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                    borderColor: '#d97706',
+                    color: '#fbbf24',
+                  }}
+                >
+                  🧪 테스트 시뮬레이션
+                  {testAssignments.length > 0 ? ' (재실행)' : ''}
+                </button>
+
+                {/* 관리자 확정 배정 버튼 */}
+                {adminMode && (
+                  <button
+                    onClick={handleRunAssignment}
+                    disabled={isSpinning}
+                    className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm text-stone-900 transition hover:opacity-90 shadow-lg active:scale-95 disabled:opacity-50"
+                    style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
+                  >
+                    🎲 확정 배정 실행{assignments.length > 0 ? ' (재배정)' : ''}
+                  </button>
+                )}
+
+                {adminMode && assignments.length > 0 && (
+                  <button
+                    onClick={handleClearAssignment}
+                    className="px-4 py-3 rounded-xl text-xs font-bold text-red-400 border border-red-800/60 hover:bg-red-900/30 transition"
+                  >
+                    배정 초기화
+                  </button>
+                )}
+
+                {assignSavedAt && (
+                  <span className="text-xs text-slate-500">
+                    마지막 확정: {new Date(assignSavedAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+
+              {/* ── 테스트 시뮬레이션 결과 ── */}
+              {testAssignments.length > 0 && (
+                <div className="mb-6">
+                  <div className="rounded-2xl border-2 border-dashed border-amber-600/60 overflow-hidden" style={{ background: 'rgba(120,80,20,0.08)' }}>
+                    <div className="px-5 py-3 border-b border-amber-800/30 flex items-center justify-between" style={{ background: 'rgba(217,119,6,0.1)' }}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🧪</span>
+                        <p className="text-sm font-bold text-amber-400">테스트 시뮬레이션 결과</p>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-500 border border-amber-700/50 font-bold">미저장</span>
+                      </div>
+                      <button
+                        onClick={() => setTestAssignments([])}
+                        className="text-xs text-slate-500 hover:text-slate-300 transition"
+                      >
+                        ✕ 닫기
+                      </button>
+                    </div>
+                    <div className="px-5 py-4">
+                      <div className="space-y-3">
+                        {testAssignments.map((asgn) => {
+                          const token = encodeToken(asgn);
+                          return (
+                            <div
+                              key={asgn.candidateId}
+                              className="rounded-xl border border-amber-800/20 overflow-hidden"
+                              style={{ background: 'rgba(20,15,5,0.5)' }}
+                            >
+                              <div className="px-4 py-3 flex items-center gap-3">
+                                {/* 이니셜 */}
+                                <div
+                                  className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-black flex-shrink-0"
+                                  style={{ background: 'linear-gradient(135deg, #d97706 0%, #92400e 100%)', color: '#1a1207' }}
+                                >
+                                  {asgn.candidateName.charAt(0)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-sm text-slate-200">{asgn.candidateName}</p>
+                                  <p className="text-[10px] text-slate-500">{asgn.candidateTeam}</p>
+                                </div>
+                                {/* 배정된 문제 미니 뱃지 */}
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-black text-blue-400 bg-blue-900/30 px-2 py-1 rounded border border-blue-800/50">#{asgn.stock_transfer}</span>
+                                  <span className="text-xs font-black text-purple-400 bg-purple-900/30 px-2 py-1 rounded border border-purple-800/50">#{asgn.nominee_stock}</span>
+                                  <span className="text-xs font-black text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded border border-emerald-800/50">#{asgn.temporary_payment}</span>
+                                </div>
+                                <span className="text-[10px] text-slate-600 font-mono">{token}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-3 text-center">
+                        ⚠️ 테스트 결과는 저장되지 않습니다. 확정하려면 관리자 모드에서 "확정 배정 실행"을 클릭하세요.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── 확정 배정 결과 ── */}
+              {assignments.length === 0 && testAssignments.length === 0 ? (
+                <div className="text-center py-10 border border-dashed border-amber-800/40 rounded-2xl">
+                  <div className="text-4xl mb-3">🎲</div>
+                  <p className="text-slate-400 text-sm font-medium">아직 배정이 실행되지 않았습니다</p>
+                  <p className="text-slate-500 text-xs mt-1">
+                    "🧪 테스트 시뮬레이션"으로 미리 확인하거나, 관리자 모드에서 확정 배정을 실행하세요
+                  </p>
+                </div>
+              ) : assignments.length > 0 && (
+                /* 확정 배정 결과 카드 목록 */
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                      ✅ 확정 배정 완료
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/30 text-emerald-500 border border-emerald-700/40 font-bold">저장됨</span>
+                    <span className="text-xs text-slate-500 ml-auto">아래 URL을 각 피평가자에게 전달하세요</span>
+                  </div>
+                  {assignments.map((asgn) => {
+                    const token   = encodeToken(asgn);
+                    const examUrl = `${window.location.origin}/question-selection/exam/${token}`;
+                    const isCopied = copiedToken === token;
+
+                    return (
+                      <div
+                        key={asgn.candidateId}
+                        className="rounded-2xl border border-amber-800/30 overflow-hidden"
+                        style={{ background: 'rgba(30,20,5,0.6)' }}
+                      >
+                        {/* 후보자 헤더 */}
+                        <div className="px-5 py-3.5 flex items-center gap-3 border-b border-amber-900/20">
+                          <div
+                            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black flex-shrink-0"
+                            style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)', color: '#1a1207' }}
+                          >
+                            {asgn.candidateName.charAt(0)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-slate-100">{asgn.candidateName}</p>
+                            <p className="text-xs text-slate-500">{asgn.candidateTeam}</p>
+                          </div>
+                          <div className="text-xs text-slate-500 font-mono bg-slate-800 px-2 py-1 rounded">
+                            토큰: {token}
+                          </div>
+                        </div>
+
+                        <div className="px-5 py-4">
+                          {/* 배정 문제 3개 */}
+                          <div className="grid grid-cols-3 gap-2 mb-4">
+                            {[
+                              { key: 'stock_transfer',    icon: '📊', label: '주식이동',  color: 'text-blue-400',    border: 'border-blue-800/50',    bg: 'bg-blue-900/15' },
+                              { key: 'nominee_stock',     icon: '🔐', label: '차명주식',  color: 'text-purple-400',  border: 'border-purple-800/50',  bg: 'bg-purple-900/15' },
+                              { key: 'temporary_payment', icon: '💰', label: '가지급금',  color: 'text-emerald-400', border: 'border-emerald-800/50', bg: 'bg-emerald-900/15' },
+                            ].map(({ key, icon, label, color, border, bg }) => {
+                              const qId  = asgn[key];
+                              const qData = QS_QUESTIONS[qId];
+                              return (
+                                <div key={key} className={`rounded-xl p-3 border ${border} ${bg}`}>
+                                  <div className="flex items-center gap-1 mb-1.5">
+                                    <span className="text-xs">{icon}</span>
+                                    <span className="text-[10px] text-slate-500 font-medium">{label}</span>
+                                  </div>
+                                  <p className={`text-xl font-black ${color}`}>#{qId}</p>
+                                  <p className="text-[10px] text-slate-400 mt-0.5 leading-tight line-clamp-2">
+                                    {qData?.title?.split(' - ').slice(-1)[0] || qData?.title || ''}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* URL 공유 + 문제 페이지 직접 이동 */}
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 min-w-0 bg-slate-900 rounded-lg px-3 py-2 border border-slate-700 overflow-hidden">
+                              <p className="text-[10px] text-slate-500 mb-0.5">출제 확인 URL</p>
+                              <p className="text-xs font-mono text-slate-300 truncate">{examUrl}</p>
+                            </div>
+                            <button
+                              onClick={() => handleCopyUrl(token)}
+                              className={`px-4 py-2.5 rounded-xl text-xs font-bold flex-shrink-0 transition border ${
+                                isCopied
+                                  ? 'bg-emerald-900/40 text-emerald-400 border-emerald-700/60'
+                                  : 'text-stone-900 border-transparent hover:opacity-90'
+                              }`}
+                              style={!isCopied ? {
+                                background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)',
+                              } : {}}
+                            >
+                              {isCopied ? '✅ 복사됨' : '🔗 URL 복사'}
+                            </button>
+                            <button
+                              onClick={() => navigate(`/question-selection/exam/${token}`)}
+                              className="px-4 py-2.5 rounded-xl text-xs font-bold flex-shrink-0 border border-blue-600 text-blue-400 hover:bg-blue-900/30 transition flex items-center gap-1.5"
+                            >
+                              📋 문제 확인 →
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* 전체 URL 일괄 복사 */}
+                  <button
+                    onClick={() => {
+                      const text = assignments.map(a => {
+                        const t = encodeToken(a);
+                        return `${a.candidateName}: ${window.location.origin}/question-selection/exam/${t}`;
+                      }).join('\n');
+                      navigator.clipboard.writeText(text).then(() => {
+                        setCopiedToken('ALL');
+                        setTimeout(() => setCopiedToken(''), 3000);
+                      });
+                    }}
+                    className="w-full py-3 rounded-xl text-sm font-bold border transition"
+                    style={copiedToken === 'ALL'
+                      ? { background: 'rgba(5,150,105,0.15)', borderColor: '#065f46', color: '#6ee7b7' }
+                      : { background: 'rgba(214,173,101,0.08)', borderColor: 'rgb(120,80,20)', color: 'rgb(214,173,101)' }
+                    }
+                  >
+                    {copiedToken === 'ALL' ? '✅ 3명 URL 모두 복사됨' : '📋 3명 URL 전체 복사'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ 치프인증 진행 일정 타임라인 ═══ */}
+      {votingConfig.closed && (
+        <div className="mt-8">
+          <div
+            className="rounded-2xl overflow-hidden border shadow-xl"
+            style={{ borderColor: '#374151', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}
+          >
+            {/* 타이틀 */}
+            <div className="px-6 py-4 border-b border-slate-700" style={{ background: 'rgba(30,41,59,0.8)' }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">📅</span>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-200">치프인증 진행 일정</h2>
+                    <p className="text-xs text-slate-500">2-2단계 ~ 8단계 · 3월 18일부터 순차 진행</p>
+                  </div>
+                </div>
+                {(() => {
+                  const now = new Date();
+                  const isMentoring = now >= MENTORING_START && now <= MENTORING_END;
+                  return isMentoring ? (
+                    <span className="text-xs px-3 py-1.5 rounded-full font-bold border"
+                      style={{ background: '#1c2f1c', borderColor: '#166534', color: '#4ade80' }}>
+                      📚 멘토링 기간 진행중
+                    </span>
+                  ) : null;
+                })()}
+              </div>
+            </div>
+
+            {/* 타임라인 */}
+            <div className="px-6 py-5">
+              <div className="relative">
+                {/* 세로 연결선 */}
+                <div className="absolute left-[18px] top-3 bottom-3 w-0.5 bg-slate-700" />
+
+                <div className="space-y-1">
+                  {SCHEDULE_MILESTONES.map((ms, idx) => {
+                    const currentStep = getCurrentStep();
+                    const isPast = currentStep && SCHEDULE_MILESTONES.findIndex(m => m.step === currentStep) > idx;
+                    const isCurrent = currentStep === ms.step;
+                    const isFuture = !isPast && !isCurrent;
+
+                    return (
+                      <div key={ms.step} className="relative flex items-start gap-4 py-2.5">
+                        {/* 도트 */}
+                        <div
+                          className="w-[38px] h-[38px] rounded-full flex items-center justify-center text-base flex-shrink-0 relative z-10 border-2 shadow-lg"
+                          style={{
+                            background: isPast ? '#1e293b' : isCurrent ? ms.color : '#0f172a',
+                            borderColor: isPast ? '#475569' : ms.color,
+                            opacity: isFuture ? 0.4 : 1,
+                          }}
+                        >
+                          {isPast ? '✅' : ms.icon}
+                        </div>
+
+                        {/* 내용 */}
+                        <div className={`flex-1 min-w-0 ${isFuture ? 'opacity-40' : ''}`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span
+                              className="text-[10px] font-black px-2 py-0.5 rounded"
+                              style={{ background: `${ms.color}30`, color: ms.color }}
+                            >
+                              {ms.step}단계
+                            </span>
+                            <span className="text-sm font-bold text-slate-200">{ms.title}</span>
+                            {isCurrent && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse"
+                                style={{ background: `${ms.color}25`, color: ms.color, border: `1px solid ${ms.color}50` }}>
+                                진행중
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 mb-1.5">{ms.date}</p>
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                            {ms.items.map((item, i) => (
+                              <span key={i} className="text-[11px] text-slate-400 leading-relaxed">
+                                • {item}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

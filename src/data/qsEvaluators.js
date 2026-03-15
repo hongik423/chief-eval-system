@@ -9,6 +9,7 @@ export const QS_EVALUATORS = [
   { id: 'kyd', name: '권영도', role: '평가위원',   defaultPassword: 'kyd' },
   { id: 'kok', name: '권오경', role: '평가위원',   defaultPassword: 'kok' },
   { id: 'kh',  name: '김홍',   role: '평가위원',   defaultPassword: 'kh'  },
+  { id: 'kjh', name: '강지훈', role: '평가위원',   defaultPassword: 'kjh' },
   { id: 'psh', name: '박성현', role: '평가위원',   defaultPassword: 'psh' },
   { id: 'yds', name: '윤덕상', role: '평가위원',   defaultPassword: 'yds' },
   { id: 'hsh', name: '하상현', role: '평가위원',   defaultPassword: 'hsh' },

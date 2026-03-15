@@ -34,7 +34,7 @@ export default function AnnouncementModal({ open, onClose }) {
             </ul>
             <h4 className="font-semibold text-slate-200 mt-3 mb-1">1.3 평가 대상</h4>
             <ul className="list-disc pl-5 space-y-1">
-              <li>치프 인증 지원 어쏘: 김민경, 김창곤, 백진영, 양현호</li>
+              <li>치프 인증 지원 어쏘: 김창곤, 백진영, 양현호</li>
               <li>2026년 상반기 지원 예상 인원: 5명 내외</li>
             </ul>
           </section>
@@ -45,7 +45,7 @@ export default function AnnouncementModal({ open, onClose }) {
             <h4 className="font-semibold text-slate-200 mt-3 mb-1">2.1 평가위원회 구성</h4>
             <ul className="list-disc pl-5 space-y-1">
               <li>평가위원장: 나동환 대표</li>
-              <li>평가위원: 권영도, 권오경, 김홍, 박성현, 윤덕상, 하상현 6명 이상 (코치자격보유 치프)</li>
+              <li>평가위원: 권영도, 권오경, 김홍, 강지훈, 박성현, 윤덕상, 하상현 7명 이상 (코치자격보유 치프)</li>
             </ul>
             <h4 className="font-semibold text-slate-200 mt-3 mb-1">2.2 평가 구성 및 배점 (총 110점 = PM 역량평가 100점 + 가점제도 10점)</h4>
             <table className={tableClass}>

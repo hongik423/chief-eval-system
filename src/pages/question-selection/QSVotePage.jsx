@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QS_CATEGORIES, QS_QUESTIONS, QS_PDF_URL } from '@/data/qsQuestions';
-import { submitVote, getEvaluatorVote } from '@/lib/qsVoteStore';
+import { submitVote, getEvaluatorVote, getVotingConfig } from '@/lib/qsVoteStore';
 
 const CATEGORY_KEYS = Object.keys(QS_CATEGORIES);
 const REQUIRED_PER_CATEGORY = 3;
@@ -23,6 +23,12 @@ export default function QSVotePage() {
   const [loadingPrev, setLoadingPrev] = useState(false);
 
   useEffect(() => {
+    // 투표 마감 시 결과 페이지로 이동
+    if (getVotingConfig().closed) {
+      navigate('/question-selection/results', { replace: true });
+      return;
+    }
+
     const stored = sessionStorage.getItem('qs_evaluator');
     if (!stored) {
       navigate('/question-selection');
