@@ -1,14 +1,19 @@
 /**
- * 평가보고서 AI 생성 - Gemini + OpenAI 병렬 호출 후 최적 답변 선택
+ * 평가보고서 AI 생성 - Gemini + OpenAI + Claude 3중 병렬 호출 후 최적 답변 선택
  * 표지 이미지: Gemini 이미지 생성 모델 활용
  * @encoding UTF-8
+ * @version 2026-03-15-v4-triple-ai
  */
 
-// Gemini 3.0 Flash, GPT 5.2 - 우수한 성능
-const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.0-flash';
+// ─── AI 텍스트 모델 (최상급) ───
+// Gemini 3.1 Pro Preview (나노바나나 3.0 Pro · 최고 품질)
+const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-3.1-pro-preview';
+// GPT 5.2 (최신 · 2025.12)
 const OPENAI_MODEL = import.meta.env.VITE_OPENAI_MODEL || 'gpt-5.2';
-// 표지 이미지 생성용 (gemini-2.0-flash-preview-image-generation deprecated → gemini-2.5-flash-image 사용)
-const GEMINI_IMAGE_MODEL = import.meta.env.VITE_GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image';
+// Claude Opus 4.6 (최강 지능)
+const CLAUDE_MODEL = import.meta.env.VITE_CLAUDE_MODEL || 'claude-opus-4-6';
+// Gemini 이미지 생성 (나노바나나 2 · 최신)
+const GEMINI_IMAGE_MODEL = import.meta.env.VITE_GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image-preview';
 
 /**
  * Gemini 이미지 생성 - 치프인증자 이름이 들어간 표지 이미지
@@ -18,9 +23,9 @@ const GEMINI_IMAGE_MODEL = import.meta.env.VITE_GEMINI_IMAGE_MODEL || 'gemini-2.
  */
 export async function generateCoverImage(candidateName, apiKey) {
   if (!apiKey) return null;
-  const prompt = `Create a professional, elegant certificate cover image for "기업의별 치프인증 평가 보고서" (Stellain Chief Certification Evaluation Report). 
+  const prompt = `Create a professional, elegant certificate cover image for "기업의별 치프인증 평가 보고서" (Stellain Chief Certification Evaluation Report).
 The image must prominently display the recipient name "${candidateName}" (치프인증자) in Korean text.
-Style: clean, corporate, trustworthy, blue/teal color scheme. Minimal design. 
+Style: clean, corporate, trustworthy, blue/teal color scheme. Minimal design.
 Do not include any placeholder text. Use the exact name: ${candidateName}.`;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${apiKey}`;
   try {
@@ -54,7 +59,7 @@ Do not include any placeholder text. Use the exact name: ${candidateName}.`;
 }
 
 /**
- * Gemini API 호출
+ * Gemini API 호출 (gemini-3.1-pro-preview)
  */
 async function callGemini(prompt, apiKey) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
@@ -80,7 +85,7 @@ async function callGemini(prompt, apiKey) {
 }
 
 /**
- * OpenAI API 호출
+ * OpenAI API 호출 (gpt-5.2)
  */
 async function callOpenAI(prompt, apiKey) {
   const url = 'https://api.openai.com/v1/chat/completions';
@@ -108,10 +113,40 @@ async function callOpenAI(prompt, apiKey) {
 }
 
 /**
- * 두 AI 응답 중 최적 답변 선택
- * 기준: 구조적 완성도(문단 수), 길이 적정성(너무 짧지 않음), 특수문자/마크다운 활용
+ * Anthropic Claude API 호출 (claude-opus-4-6 · 최강 지능)
  */
-function selectBestResponse(geminiRes, openaiRes) {
+async function callClaude(prompt, apiKey) {
+  const url = 'https://api.anthropic.com/v1/messages';
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: 2048,
+      temperature: 0.4,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Claude API 오류: ${res.status} ${err?.error?.message || res.statusText}`);
+  }
+  const data = await res.json();
+  const text = data.content?.[0]?.text;
+  if (!text) throw new Error('Claude 응답 형식 오류');
+  return text;
+}
+
+/**
+ * 세 AI 응답 중 최적 답변 선택 (best-of-3)
+ * 기준: 구조적 완성도(문단 수), 길이 적정성, 특수문자/마크다운 활용
+ */
+function selectBestResponse(...responses) {
   const score = (text) => {
     let s = 0;
     const lines = text.trim().split(/\n/).filter(Boolean);
@@ -119,42 +154,67 @@ function selectBestResponse(geminiRes, openaiRes) {
     if (text.includes('**') || text.includes('- ') || text.includes('1.')) s += 5;
     if (text.length >= 200 && text.length <= 2000) s += 10;
     if (text.length > 2000) s -= 5;
+    // 한국어 문자 비율 체크 (한국어 보고서이므로 한글 포함 시 가산)
+    const koreanChars = (text.match(/[\uAC00-\uD7A3]/g) || []).length;
+    if (koreanChars > 50) s += 8;
     return s;
   };
-  const gScore = score(geminiRes);
-  const oScore = score(openaiRes);
-  return gScore >= oScore ? geminiRes : openaiRes;
+
+  let best = responses[0];
+  let bestScore = score(responses[0]);
+  for (let i = 1; i < responses.length; i++) {
+    const s = score(responses[i]);
+    if (s > bestScore) {
+      bestScore = s;
+      best = responses[i];
+    }
+  }
+  return best;
 }
 
 /**
- * 응시자 평가보고서 생성 - Gemini + OpenAI 병렬 호출 후 최적 선택
+ * 응시자 평가보고서 생성 - Gemini + OpenAI + Claude 3중 병렬 호출 후 최적 선택
  * 표지 이미지(Gemini 이미지 생성) 병렬 생성
- * @returns {{ content: string, coverImageBase64: string|null }}
+ * @returns {{ content: string, coverImageBase64: string|null, usedEngine: string }}
  */
 export async function generateEvaluationReport(candidateData) {
   const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
   const openaiKey = import.meta.env.VITE_OPENAI_API_KEY;
+  const claudeKey = import.meta.env.VITE_CLAUDE_API_KEY;
 
   const prompt = buildReportPrompt(candidateData);
 
-  // 보고서 본문 + 표지 이미지 병렬 생성
+  // 보고서 본문(3중 병렬) + 표지 이미지 병렬 생성
   const [reportResult, coverImageBase64] = await Promise.all([
     (async () => {
       const calls = [];
-      if (geminiKey) calls.push(callGemini(prompt, geminiKey));
-      if (openaiKey) calls.push(callOpenAI(prompt, openaiKey));
+      const engines = [];
+
+      if (geminiKey) { calls.push(callGemini(prompt, geminiKey)); engines.push('Gemini 3.1 Pro'); }
+      if (openaiKey) { calls.push(callOpenAI(prompt, openaiKey)); engines.push('GPT-5.2'); }
+      if (claudeKey) { calls.push(callClaude(prompt, claudeKey)); engines.push('Claude Opus 4.6'); }
+
       if (calls.length === 0) {
-        throw new Error('VITE_GEMINI_API_KEY 또는 VITE_OPENAI_API_KEY가 설정되지 않았습니다.');
+        throw new Error('VITE_GEMINI_API_KEY, VITE_OPENAI_API_KEY 또는 VITE_CLAUDE_API_KEY 중 하나 이상을 설정해 주세요.');
       }
+
       const results = await Promise.allSettled(calls);
+
+      // 성공한 응답만 수집 (engine 이름과 함께)
       const successes = results
-        .map((r) => (r.status === 'fulfilled' ? r.value : null))
+        .map((r, i) => r.status === 'fulfilled' ? { text: r.value, engine: engines[i] } : null)
         .filter(Boolean);
+
       if (successes.length === 0) {
         const first = results.find(r => r.status === 'rejected');
-        throw first?.reason || new Error('AI API 호출 실패');
+        throw first?.reason || new Error('AI API 호출 전부 실패');
       }
-      return successes.length === 1 ? successes[0] : selectBestResponse(successes[0], successes[1]);
+
+      if (successes.length === 1) return successes[0].text;
+
+      // best-of-N 선택
+      const best = selectBestResponse(...successes.map(s => s.text));
+      return best;
     })(),
     generateCoverImage(candidateData.candidate?.name || '', geminiKey),
   ]);
