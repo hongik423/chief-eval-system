@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { ADMIN_ID } from '@/lib/constants';
 import { SCHEDULE_MILESTONES } from '@/lib/qsAssignmentStore';
+import { QS_CANDIDATES, findQsCandidate, setQsCandidateSession } from '@/data/qsCandidates';
 import { Card, Button, ConnectionStatus } from '@/components/ui';
 import ManualModal from '@/components/ManualModal';
 import AnnouncementModal from '@/components/AnnouncementModal';
@@ -16,11 +17,14 @@ export default function LoginPage() {
   const loginEvaluators = evaluators?.length > 0 ? evaluators : (allEvaluators || []);
   const [selectedId, setSelectedId] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isCandidate, setIsCandidate] = useState(false);
+  const [candidateId, setCandidateId] = useState('');
   const [adminId, setAdminId] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const selectedEv = loginEvaluators.find(e => e.id === selectedId && !isAdmin);
+  const selectedCandidate = QS_CANDIDATES.find(c => c.id === candidateId);
 
   const handleLogin = async () => {
     if (!selectedId) return;
@@ -47,6 +51,8 @@ export default function LoginPage() {
   const handleSelectEvaluator = (id) => {
     setSelectedId(id);
     setIsAdmin(false);
+    setIsCandidate(false);
+    setCandidateId('');
     setAdminId('');
     setPassword('');
   };
@@ -54,8 +60,33 @@ export default function LoginPage() {
   const handleSelectAdmin = () => {
     setSelectedId('admin');
     setIsAdmin(true);
+    setIsCandidate(false);
+    setCandidateId('');
     setAdminId('');
     setPassword('');
+  };
+
+  const handleSelectCandidate = (id) => {
+    setSelectedId(null);
+    setIsAdmin(false);
+    setIsCandidate(true);
+    setCandidateId(id);
+    setAdminId('');
+    setPassword('');
+  };
+
+  const handleCandidateLogin = () => {
+    if (!candidateId || !password.trim()) {
+      toast.error('이름을 선택하고 비밀번호를 입력해 주세요.');
+      return;
+    }
+    const found = findQsCandidate(candidateId, password.trim());
+    if (found) {
+      setQsCandidateSession({ id: found.id, name: found.name, team: found.team });
+      window.location.href = '/question-selection/results';
+    } else {
+      toast.error('비밀번호가 올바르지 않습니다.');
+    }
   };
 
   const handleConfirmIntroBanner = () => {
@@ -229,9 +260,64 @@ export default function LoginPage() {
             </div>
             {isAdmin && <span className="text-yellow-400 text-base ml-auto">✓</span>}
           </div>
+
+          <div className="h-px bg-surface-500/40 my-4" />
+
+          {/* 피평가자 로그인 - 2차 출제 배정 문제 확인 */}
+          <div className="text-xs font-semibold text-slate-500 mb-3 tracking-widest">피평가자 로그인 (2차 출제 문제 확인)</div>
+          <div className="space-y-1.5">
+            {QS_CANDIDATES.map((c) => (
+              <div
+                key={c.id}
+                data-testid={`candidate-${c.id}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => handleSelectCandidate(c.id)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSelectCandidate(c.id)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-150
+                  ${isCandidate && candidateId === c.id
+                    ? 'bg-emerald-500/10 border border-emerald-500/30'
+                    : 'border border-transparent hover:bg-surface-300/50'
+                  }`}
+              >
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold transition-colors
+                  ${isCandidate && candidateId === c.id
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-surface-300 text-slate-400'
+                  }`}>
+                  👤
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-white">{c.name} <span className="text-slate-500 font-normal">({c.id})</span></div>
+                  <div className="text-[11px] text-slate-500">{c.team} · 배정 출제문제 확인</div>
+                </div>
+                {isCandidate && candidateId === c.id && (
+                  <span className="text-emerald-400 text-base">✓</span>
+                )}
+              </div>
+            ))}
+          </div>
         </Card>
 
-        {/* ID + Password Input */}
+        {/* 피평가자 비밀번호 입력 */}
+        {isCandidate && candidateId && (
+          <Card className="mb-4 !p-4 space-y-3 border-emerald-700/40">
+            <div className="text-xs text-emerald-400/80 mb-1">👤 {selectedCandidate?.name} · 배정 출제문제 확인</div>
+            <div>
+              <div className="text-xs font-semibold text-slate-500 mb-1">비밀번호 (초기: {selectedCandidate?.defaultPassword})</div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCandidateLogin()}
+                placeholder="비밀번호 입력"
+                className="w-full px-4 py-3 rounded-xl border border-surface-500 bg-surface-100 text-white placeholder-slate-600 outline-none focus:border-emerald-500 transition-colors"
+              />
+            </div>
+          </Card>
+        )}
+
+        {/* ID + Password Input (평가위원/관리자) */}
         {(selectedId && (selectedEv || isAdmin)) && (
           <Card className="mb-4 !p-4 space-y-3">
             {isAdmin && (
@@ -266,14 +352,25 @@ export default function LoginPage() {
           </Card>
         )}
 
-        <Button
-          size="lg"
-          disabled={!selectedId || !password.trim() || (isAdmin && !adminId.trim()) || loading}
-          onClick={handleLogin}
-          className="w-full rounded-xl"
-        >
-          {loading ? '로그인 중...' : isAdmin ? '관리자로 입장' : '평가 시작'}
-        </Button>
+        {isCandidate ? (
+          <Button
+            size="lg"
+            disabled={!candidateId || !password.trim()}
+            onClick={handleCandidateLogin}
+            className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500"
+          >
+            📋 출제 문제 보기
+          </Button>
+        ) : (
+          <Button
+            size="lg"
+            disabled={!selectedId || !password.trim() || (isAdmin && !adminId.trim()) || loading}
+            onClick={handleLogin}
+            className="w-full rounded-xl"
+          >
+            {loading ? '로그인 중...' : isAdmin ? '관리자로 입장' : '평가 시작'}
+          </Button>
+        )}
 
         <p className="text-center text-[11px] text-slate-600 mt-6">
           평가일: 2026년 3월 28일(토) · 문의: 010-9251-9743
