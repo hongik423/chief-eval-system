@@ -96,9 +96,14 @@ async function callGeminiImage(prompt, apiKey) {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  Claude Sonnet 4.6 — 메인 보고서 생성
+//  Claude Sonnet 4.6 — 메인 보고서 생성 (자동 연속 생성)
+//  max_tokens: 32768 + output-128k 베타 헤더
+//  중단 시 최대 2회 추가 호출하여 완성
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-async function callClaude(prompt, apiKey) {
+const CLAUDE_MAX_TOKENS = 32768;
+const MAX_CONTINUATIONS = 2;  // 최대 연속 호출 횟수
+
+async function callClaudeOnce(messages, apiKey) {
   const url = 'https://api.anthropic.com/v1/messages';
   const res = await fetch(url, {
     method: 'POST',
@@ -107,28 +112,61 @@ async function callClaude(prompt, apiKey) {
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true',
+      'anthropic-beta': 'output-128k-2025-02-19',
     },
     body: JSON.stringify({
       model: CLAUDE_MODEL,
-      max_tokens: 16384,   // 충분한 토큰으로 보고서 중단 방지
+      max_tokens: CLAUDE_MAX_TOKENS,
       temperature: 0.3,
-      messages: [{ role: 'user', content: prompt }],
+      messages,
     }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(`Claude API 오류: ${res.status} ${err?.error?.message || res.statusText}`);
   }
-  const data = await res.json();
-  const text = data.content?.[0]?.text;
-  if (!text) throw new Error('Claude 응답 형식 오류');
+  return await res.json();
+}
 
-  // stop_reason 체크 — max_tokens로 끊겼으면 경고
-  if (data.stop_reason === 'max_tokens') {
-    console.warn('⚠️ 보고서가 토큰 한도에 도달하여 일부 잘릴 수 있습니다. stop_reason:', data.stop_reason);
+async function callClaude(prompt, apiKey, onProgress) {
+  // ── 1차 호출 ──
+  const messages = [{ role: 'user', content: prompt }];
+  const firstResult = await callClaudeOnce(messages, apiKey);
+  let fullText = firstResult.content?.[0]?.text || '';
+  if (!fullText) throw new Error('Claude 응답 형식 오류');
+
+  let stopReason = firstResult.stop_reason;
+  let continuations = 0;
+
+  // ── 연속 생성: stop_reason이 'max_tokens'이고 '— 보고서 끝 —'이 없으면 이어서 생성 ──
+  while (stopReason === 'max_tokens' && !fullText.includes('— 보고서 끝 —') && continuations < MAX_CONTINUATIONS) {
+    continuations++;
+    console.log(`📝 보고서 연속 생성 ${continuations}/${MAX_CONTINUATIONS}회차...`);
+    if (onProgress) {
+      onProgress({ step: 2, total: 4, message: `보고서 연속 작성 중... (${continuations}/${MAX_CONTINUATIONS}회차)` });
+    }
+
+    // 이전 대화를 이어서 보내기 (assistant 응답 + user 연속 요청)
+    const contMessages = [
+      { role: 'user', content: prompt },
+      { role: 'assistant', content: fullText },
+      { role: 'user', content: `이전 응답이 토큰 한도로 중단되었습니다. 바로 위 내용에 이어서 나머지 섹션을 모두 완성해 주세요.
+중복 없이 끊긴 지점부터 이어 작성하세요. 마지막에 반드시 "— 보고서 끝 —"을 기재하세요.` },
+    ];
+
+    const contResult = await callClaudeOnce(contMessages, apiKey);
+    const contText = contResult.content?.[0]?.text || '';
+    if (contText) {
+      fullText += '\n' + contText;
+    }
+    stopReason = contResult.stop_reason;
   }
 
-  return text;
+  if (continuations > 0) {
+    console.log(`✅ 보고서 연속 생성 완료 (총 ${continuations + 1}회 호출, ${fullText.length}자)`);
+  }
+
+  return fullText;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -180,7 +218,7 @@ export async function generateEvaluationReport(candidateData, onProgress = () =>
 
   try {
     if (claudeKey) {
-      content = await callClaude(prompt, claudeKey);
+      content = await callClaude(prompt, claudeKey, onProgress);
     } else {
       throw new Error('Claude API 키 없음 — Gemini로 전환');
     }
