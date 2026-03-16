@@ -530,17 +530,17 @@ export const useStore = create((set, get) => ({
   // ═══════════════════════════════
   // Update candidate status (pass/fail)
   // ═══════════════════════════════
-  updateCandidateStatus: async (candidateId, status) => {
+  updateCandidateStatus: async (candidateId, status, scoringMethod = 'default') => {
     const state = get();
     const { error } = await supabase.from('chief_candidates')
-      .update({ status })
+      .update({ status, scoring_method: scoringMethod })
       .eq('id', candidateId);
 
     if (error) throw error;
 
     set({
       candidates: state.candidates.map(c =>
-        c.id === candidateId ? { ...c, status } : c
+        c.id === candidateId ? { ...c, status, scoring_method: scoringMethod } : c
       ),
     });
   },

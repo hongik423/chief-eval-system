@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { PASS_SCORE, TOTAL_MAX_SCORE } from '@/lib/constants';
 import {
@@ -40,6 +40,9 @@ export default function AdminDashboard() {
   const [expandedEvaluator, setExpandedEvaluator] = useState(null);
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  // ─── 점수 산정 방식 토글 ───
+  // 'default' = 전체 평균  |  'trimmed' = 최고·최저 제외 평균
+  const [scoringMethod, setScoringMethod] = useState('default');
 
   useEffect(() => {
     if (activeTab === 'audit') loadAuditLog();
@@ -47,9 +50,60 @@ export default function AdminDashboard() {
   }, [activeTab, selectedPeriodId]);
 
   // Candidate results (sessions/scores 변경 시에도 재계산)
-  const candidateResults = useMemo(() =>
+  const candidateResultsRaw = useMemo(() =>
     candidates.map(c => getCandidateResult(c.id)).filter(Boolean)
   , [candidates, getCandidateResult, bonusScores, sessions, scores]);
+
+  // ─── 트림 평균 재계산 유틸 ───
+  const applyTrimmed = (result) => {
+    const passScore = periodInfo?.passScore ?? PASS_SCORE;
+    // 유효 평가위원(소속제외 + 완료) — {id, score} 쌍으로 추출
+    const validEntries = result.evaluatorDetails
+      .filter(ed => !ed.isSameTeam && ed.isComplete)
+      .map(ed => ({ id: ed.evaluator.id, score: ed.totalScore }));
+
+    if (validEntries.length < 3) {
+      // 3명 미만이면 트림 불가 → 기본 방식 유지 + trimUnavailable 플래그
+      return { ...result, trimUnavailable: true };
+    }
+
+    const sorted = [...validEntries].sort((a, b) => a.score - b.score);
+    const minEntry = sorted[0];                       // 최저점 평가위원
+    const maxEntry = sorted[sorted.length - 1];       // 최고점 평가위원
+    // 제외 대상 ID Set (중복 점수여도 정확히 1명씩만 제외)
+    const excludedIds = new Set([minEntry.id, maxEntry.id]);
+
+    const remaining = sorted.filter(e => !excludedIds.has(e.id));
+    const trimCount = remaining.length;
+    const trimSum = remaining.reduce((s, e) => s + e.score, 0);
+    const bonus = result.bonus;
+    const trimAvg = (trimSum + bonus) / trimCount;
+    const trimPass = trimAvg >= passScore;
+
+    return {
+      ...result,
+      finalAvg: trimAvg,
+      pass: trimPass,
+      evalCount: trimCount,
+      totalSum: trimSum,
+      trimInfo: {
+        excludedMin: minEntry.score,
+        excludedMax: maxEntry.score,
+        excludedIds,   // ← ID 기반 제외 판별용
+        originalAvg: result.finalAvg,
+        originalPass: result.pass,
+        originalEvalCount: result.evalCount,
+      },
+    };
+  };
+
+  // scoringMethod에 따라 결과 분기
+  const candidateResults = useMemo(() => {
+    if (scoringMethod === 'trimmed') {
+      return candidateResultsRaw.map(r => applyTrimmed(r));
+    }
+    return candidateResultsRaw;
+  }, [candidateResultsRaw, scoringMethod, periodInfo]);
 
   // Stats
   const stats = useMemo(() => {
@@ -72,7 +126,7 @@ export default function AdminDashboard() {
 
   const handleJudge = async (candId, pass) => {
     try {
-      await updateCandidateStatus(candId, pass ? 'passed' : 'failed');
+      await updateCandidateStatus(candId, pass ? 'passed' : 'failed', scoringMethod);
       toast.success(`${candidates.find(c => c.id === candId)?.name} → ${pass ? '합격' : '불합격'} 처리`);
     } catch (err) {
       toast.error('상태 변경 실패');
@@ -171,9 +225,20 @@ export default function AdminDashboard() {
                   />
                 </div>
                 {r.finalAvg != null ? (
-                  <Badge variant={r.pass ? 'green' : 'red'}>
-                    {r.pass ? '합격' : '미달'} · {r.finalAvg.toFixed(1)}점
-                  </Badge>
+                  <div className="space-y-1">
+                    <Badge variant={r.pass ? 'green' : 'red'}>
+                      {r.pass ? '합격' : '미달'} · {r.finalAvg.toFixed(1)}점
+                    </Badge>
+                    {r.trimInfo && !r.trimUnavailable && (
+                      <div className="text-[10px] text-amber-400/70">
+                        제외: ↓{r.trimInfo.excludedMin} ↑{r.trimInfo.excludedMax}
+                        <span className="text-slate-600 ml-1">(기본: {r.trimInfo.originalAvg?.toFixed(1)})</span>
+                      </div>
+                    )}
+                    {r.trimUnavailable && (
+                      <div className="text-[10px] text-red-400/60">트림 불가 (3명 미만)</div>
+                    )}
+                  </div>
                 ) : (
                   <Badge variant="muted">
                     평가 대기 ({r.evalCount}명 완료)
@@ -201,15 +266,52 @@ export default function AdminDashboard() {
             </div>
           </Card>
 
-          {/* Formula */}
+          {/* ── 점수 산정 방식 선택 + 공식 ── */}
           <Card className="bg-surface-300/50">
-            <div className="text-sm font-bold text-white mb-2">📐 점수 산정 공식</div>
-            <div className="text-xs text-slate-400 leading-relaxed space-y-1">
-              <div>평균 점수 = (Σ 평가위원 PM역량점수 + 가점) ÷ N  <span className="text-slate-500">(N = 유효 평가위원 수)</span></div>
-              <div className="text-amber-400/80 font-semibold">※ 가점은 획득점수 / N (N = 평가위원의 수) 으로 적용</div>
-              <div>※ 소속 평가위원 점수는 총점 및 평가인원(N)에서 제외</div>
-              <div>※ 합격 기준: 평균 {periodInfo?.passScore ?? PASS_SCORE}점 이상 ({periodInfo?.totalMaxScore ?? TOTAL_MAX_SCORE}점 만점 기준)</div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+              <div className="text-sm font-bold text-white">📐 점수 산정 방식</div>
+              {/* Toggle Buttons */}
+              <div className="flex rounded-lg overflow-hidden border border-surface-500/40">
+                <button
+                  onClick={() => setScoringMethod('default')}
+                  className={`px-3 py-1.5 text-xs font-semibold transition-all ${
+                    scoringMethod === 'default'
+                      ? 'bg-brand-500 text-white'
+                      : 'bg-surface-200 text-slate-400 hover:text-white hover:bg-surface-300'
+                  }`}
+                >
+                  기본 — 전체 평균
+                </button>
+                <button
+                  onClick={() => setScoringMethod('trimmed')}
+                  className={`px-3 py-1.5 text-xs font-semibold transition-all border-l border-surface-500/40 ${
+                    scoringMethod === 'trimmed'
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-surface-200 text-slate-400 hover:text-white hover:bg-surface-300'
+                  }`}
+                >
+                  최고·최저 제외 평균
+                </button>
+              </div>
             </div>
+
+            {scoringMethod === 'default' ? (
+              <div className="text-xs text-slate-400 leading-relaxed space-y-1 pl-1 border-l-2 border-brand-500/40 ml-1">
+                <div>평균 점수 = (Σ 평가위원 PM역량점수 + 가점) ÷ N  <span className="text-slate-500">(N = 유효 평가위원 수)</span></div>
+                <div className="text-amber-400/80 font-semibold">※ 가점은 획득점수 / N (N = 평가위원의 수) 으로 적용</div>
+                <div>※ 소속 평가위원 점수는 총점 및 평가인원(N)에서 제외</div>
+                <div>※ 합격 기준: 평균 {periodInfo?.passScore ?? PASS_SCORE}점 이상 ({periodInfo?.totalMaxScore ?? TOTAL_MAX_SCORE}점 만점 기준)</div>
+              </div>
+            ) : (
+              <div className="text-xs text-slate-400 leading-relaxed space-y-1 pl-1 border-l-2 border-amber-500/40 ml-1">
+                <div className="text-amber-300 font-semibold">평균 점수 = (Σ 평가위원 PM역량점수 <span className="text-red-400">− 최고점 − 최저점</span> + 가점) ÷ N'</div>
+                <div><span className="text-slate-500">N' = 유효 평가위원 수 − 2</span>  (최고 1명 + 최저 1명 제외)</div>
+                <div className="text-amber-400/80 font-semibold">※ 가점은 획득점수 / N' (N' = 트림 후 평가위원 수) 으로 적용</div>
+                <div>※ 소속 평가위원 점수는 총점 및 평가인원에서 제외 (기본과 동일)</div>
+                <div className="text-red-400/70">※ 유효 평가위원 3명 미만 시 트림 불가 → 기본 방식 자동 적용</div>
+                <div>※ 합격 기준: 평균 {periodInfo?.passScore ?? PASS_SCORE}점 이상 ({periodInfo?.totalMaxScore ?? TOTAL_MAX_SCORE}점 만점 기준)</div>
+              </div>
+            )}
           </Card>
         </div>
       )}
@@ -234,6 +336,15 @@ export default function AdminDashboard() {
       {/* ═══ TAB: Candidates Detail ═══ */}
       {activeTab === 'candidates' && (
         <div className="space-y-3">
+          {/* 현재 산정 방식 표시 */}
+          <div className="flex items-center justify-end gap-2 mb-1">
+            <span className="text-[11px] text-slate-500">적용 중인 산정 방식:</span>
+            {scoringMethod === 'trimmed' ? (
+              <Badge variant="amber">최고·최저 제외 평균</Badge>
+            ) : (
+              <Badge variant="brand">전체 평균 (기본)</Badge>
+            )}
+          </div>
           {candidateResults.map(result => {
             const isExpanded = expandedCandidate === result.candidate.id;
             return (
@@ -260,7 +371,16 @@ export default function AdminDashboard() {
                         ${result.pass ? 'text-emerald-400' : 'text-red-400'}`}>
                         {result.finalAvg.toFixed(1)}
                       </div>
-                      <div className="text-[10px] text-slate-500">평균 (가점 포함)</div>
+                      <div className="text-[10px] text-slate-500">
+                        {scoringMethod === 'trimmed' && !result.trimUnavailable
+                          ? '트림 평균 (최고·최저 제외)'
+                          : '평균 (가점 포함)'}
+                      </div>
+                      {result.trimInfo && !result.trimUnavailable && (
+                        <div className="text-[9px] text-amber-400/60 mt-0.5">
+                          기본: {result.trimInfo.originalAvg?.toFixed(1)}점
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -304,28 +424,44 @@ export default function AdminDashboard() {
                           </tr>
                         </thead>
                         <tbody>
-                          {result.evaluatorDetails.map(ed => (
-                            <tr key={ed.evaluator.id} className={`border-b border-surface-500/10 ${ed.isSameTeam ? 'opacity-30' : ''}`}>
+                          {result.evaluatorDetails.map(ed => {
+                            // 트림 모드에서 최고·최저 평가위원 식별 (ID 기반 — 중복 점수 오판 방지)
+                            const isTrimExcluded = scoringMethod === 'trimmed' && result.trimInfo && !result.trimUnavailable
+                              && result.trimInfo.excludedIds?.has(ed.evaluator.id);
+                            return (
+                            <tr key={ed.evaluator.id} className={`border-b border-surface-500/10
+                              ${ed.isSameTeam ? 'opacity-30' : ''}
+                              ${isTrimExcluded ? 'bg-amber-500/5' : ''}`}>
                               <td className="py-3 px-3 font-semibold text-white">
                                 {ed.evaluator.name}
-                                {ed.isSameTeam && <span className="text-[10px] text-slate-500 ml-1.5">(제외)</span>}
+                                {ed.isSameTeam && <span className="text-[10px] text-slate-500 ml-1.5">(소속제외)</span>}
+                                {isTrimExcluded && (
+                                  <span className="text-[10px] text-amber-400 ml-1.5">
+                                    ({ed.totalScore === result.trimInfo.excludedMax ? '↑최고' : '↓최저'} 제외)
+                                  </span>
+                                )}
                               </td>
                               {criteriaSections.map(sec => (
-                                <td key={sec.id} className="text-center py-3 px-2 font-mono font-semibold text-white">
+                                <td key={sec.id} className={`text-center py-3 px-2 font-mono font-semibold
+                                  ${isTrimExcluded ? 'text-slate-500 line-through decoration-amber-500/40' : 'text-white'}`}>
                                   {ed.isSameTeam ? '—' : (ed.sectionBreakdown[sec.id] ?? '—')}
                                 </td>
                               ))}
                               <td className={`text-center py-3 px-3 font-mono font-bold
-                                ${ed.isSameTeam ? 'text-slate-600' : ed.isComplete ? 'text-brand-400' : 'text-slate-600'}`}>
+                                ${ed.isSameTeam ? 'text-slate-600'
+                                  : isTrimExcluded ? 'text-slate-500 line-through decoration-amber-500/40'
+                                  : ed.isComplete ? 'text-brand-400' : 'text-slate-600'}`}>
                                 {ed.isSameTeam ? '—' : ed.isComplete ? ed.totalScore : '—'}
                               </td>
                               <td className="text-center py-3 px-3">
-                                {ed.isSameTeam ? <Badge variant="muted">제외</Badge>
+                                {ed.isSameTeam ? <Badge variant="muted">소속제외</Badge>
+                                  : isTrimExcluded ? <Badge variant="amber">트림제외</Badge>
                                   : ed.isComplete ? <Badge variant="green">완료</Badge>
                                   : <Badge variant="muted">미평가</Badge>}
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                           {/* Bonus */}
                           <tr className="bg-yellow-500/5">
                             <td className="py-3 px-3 text-yellow-400 font-semibold text-xs">가점 (역량강화교육)</td>
@@ -338,7 +474,11 @@ export default function AdminDashboard() {
                           {/* Final */}
                           {result.finalAvg != null && (
                             <tr className={result.pass ? 'bg-emerald-500/5' : 'bg-red-500/5'}>
-                              <td className="py-3 px-3 font-bold text-white text-sm">최종 평균 (가점 포함)</td>
+                              <td className="py-3 px-3 font-bold text-white text-sm">
+                                {scoringMethod === 'trimmed' && !result.trimUnavailable
+                                  ? '트림 평균 (최고·최저 제외 + 가점)'
+                                  : '최종 평균 (가점 포함)'}
+                              </td>
                               <td colSpan={criteriaSections.length} />
                               <td className={`text-center py-3 px-3 text-lg font-extrabold font-mono
                                 ${result.pass ? 'text-emerald-400' : 'text-red-400'}`}>
