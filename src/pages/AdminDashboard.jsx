@@ -619,6 +619,7 @@ export default function AdminDashboard() {
         <ReportTab
           candidateResults={candidateResults}
           criteriaSections={criteriaSections}
+          criteriaItems={criteriaItems}
         />
       )}
 
@@ -1178,102 +1179,319 @@ function ArchiveTab({ archives, archiveDetail, criteriaSections, onSelectArchive
   );
 }
 
-// ─── Report Tab: AI 평가보고서 생성 (Gemini + GPT 병렬) ───
-function ReportTab({ candidateResults, criteriaSections }) {
-  const [generating, setGenerating] = useState(null);
-  const [reportContent, setReportContent] = useState({});
+// ─── Report Tab: AI 평가보고서 — 피평가자별 생성 · 다운로드 ───
+function ReportTab({ candidateResults, criteriaSections, criteriaItems }) {
+  const [generating, setGenerating] = useState(null);        // 현재 생성 중인 candidate id
+  const [batchGenerating, setBatchGenerating] = useState(false); // 일괄 생성 중
+  const [progress, setProgress] = useState(null);            // { step, total, message, candidateName }
+  const [reportContent, setReportContent] = useState({});    // { [candId]: { content, coverImageBase64, sectionImages, usedEngine, generatedAt } }
   const [selectedCandidate, setSelectedCandidate] = useState(null);
 
+  // 생성 가능한 응시자 목록 (평가 완료된 평가위원이 1명 이상)
+  const generatable = candidateResults.filter(r => r.evaluatorDetails?.some(ed => ed.isComplete && !ed.isSameTeam));
+  const allGenerated = generatable.length > 0 && generatable.every(r => reportContent[r.candidate.id]?.content);
+  const generatedCount = generatable.filter(r => reportContent[r.candidate.id]?.content).length;
+
+  // ── 개별 보고서 생성 ──
   const handleGenerate = async (result) => {
     setGenerating(result.candidate.id);
+    setProgress({ step: 0, total: 4, message: '준비 중...', candidateName: result.candidate.name });
     try {
-      const { content, coverImageBase64 } = await generateEvaluationReport({
-        ...result,
-        criteriaSections,
-      });
-      setReportContent(prev => ({ ...prev, [result.candidate.id]: { content, coverImageBase64 } }));
-      setSelectedCandidate(result.candidate.id);
-      toast.success(`${result.candidate.name} 평가보고서가 생성되었습니다. (표지 이미지 포함)`);
+      const { content, coverImageBase64, sectionImages, usedEngine } = await generateEvaluationReport(
+        { ...result, criteriaSections, criteriaItems },
+        (p) => setProgress({ ...p, candidateName: result.candidate.name }),
+      );
+      setReportContent(prev => ({
+        ...prev,
+        [result.candidate.id]: {
+          content, coverImageBase64, sectionImages, usedEngine,
+          generatedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+        },
+      }));
+      const imgCount = Object.keys(sectionImages || {}).filter(k => sectionImages[k]).length;
+      toast.success(`${result.candidate.name} 보고서 완료 (이미지 ${imgCount + (coverImageBase64 ? 1 : 0)}장)`);
+      return true;
     } catch (err) {
-      toast.error('보고서 생성 실패: ' + err.message);
+      toast.error(`${result.candidate.name} 보고서 실패: ${err.message}`);
+      return false;
     } finally {
       setGenerating(null);
+      setProgress(null);
     }
   };
 
+  // ── 일괄 전체 생성 (순차) ──
+  const handleBatchGenerate = async () => {
+    setBatchGenerating(true);
+    const targets = generatable.filter(r => !reportContent[r.candidate.id]?.content);
+    let successCount = 0;
+    for (let i = 0; i < targets.length; i++) {
+      setProgress({
+        step: i + 1, total: targets.length,
+        message: `[${i + 1}/${targets.length}] ${targets[i].candidate.name} 보고서 생성 중...`,
+        candidateName: targets[i].candidate.name,
+        batchProgress: { current: i + 1, total: targets.length },
+      });
+      const ok = await handleGenerate(targets[i]);
+      if (ok) successCount++;
+    }
+    setBatchGenerating(false);
+    setProgress(null);
+    if (successCount > 0) {
+      toast.success(`전체 ${successCount}명 보고서 생성 완료!`);
+    }
+  };
+
+  // ── 개별 다운로드 ──
   const handleDownload = (candId, name) => {
     const data = reportContent[candId];
     if (!data?.content) return;
-    exportReportToDocx(data.content, name, data.coverImageBase64 || null);
-    toast.success('Word 문서로 다운로드되었습니다.');
+    exportReportToDocx(data.content, name, data.coverImageBase64 || null, data.sectionImages || {});
+    toast.success(`${name} 보고서 다운로드 완료`);
+  };
+
+  // ── 일괄 전체 다운로드 ──
+  const handleBatchDownload = () => {
+    const targets = generatable.filter(r => reportContent[r.candidate.id]?.content);
+    if (targets.length === 0) return;
+    targets.forEach((r, idx) => {
+      setTimeout(() => {
+        handleDownload(r.candidate.id, r.candidate.name);
+      }, idx * 800); // 800ms 간격으로 순차 다운로드 (브라우저 제한 방지)
+    });
+  };
+
+  // ── 이미지 수 계산 헬퍼 ──
+  const getImageCount = (data) => {
+    if (!data) return 0;
+    const sectionCount = data.sectionImages ? Object.keys(data.sectionImages).filter(k => data.sectionImages[k]).length : 0;
+    return sectionCount + (data.coverImageBase64 ? 1 : 0);
   };
 
   return (
     <div className="space-y-4">
-      <Card className="!p-4 bg-surface-300/50">
-        <div className="text-sm text-slate-400">
-          <strong className="text-white">AI 평가보고서:</strong> 응시자별로 평가위원들의 점수와 섹션별 코멘트를 반영하여
-          AI(Gemini + GPT 병렬 호출, 최적 답변 선택)로 평가보고서를 자동 생성합니다.
-          표지에 치프인증자 이름과 AI 생성 이미지가 포함되며, Word(.docx)로 다운로드됩니다.
-          <br />
-          <span className="text-xs text-slate-500 mt-1 block">
-            환경변수: VITE_GEMINI_API_KEY, VITE_OPENAI_API_KEY, VITE_GEMINI_IMAGE_MODEL (.env.local)
-          </span>
+      {/* ━━━━━━ 설명 + 일괄 액션 바 ━━━━━━ */}
+      <Card className="!p-5 bg-surface-300/50">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="flex-1">
+            <div className="text-sm text-slate-400">
+              <strong className="text-white text-base">AI 평가보고서</strong>
+              <span className="text-[10px] text-slate-500 ml-2">
+                <span className="text-brand-400">Claude Sonnet 4.6</span> + <span className="text-amber-400">나노바나나 2</span>
+              </span>
+            </div>
+            <div className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+              BARS 평가 기준 체계에 맞춰 심층 분석 보고서를 작성합니다.
+              종합평가 → 점수총괄표 → A·B·C 역량 심층분석 → 강점·보완 → 12주 성장 로드맵 → 결론
+            </div>
+            {/* 생성 현황 */}
+            <div className="flex items-center gap-3 mt-2">
+              <div className="flex items-center gap-1.5">
+                <div className={`w-2 h-2 rounded-full ${allGenerated ? 'bg-emerald-400' : generatedCount > 0 ? 'bg-amber-400' : 'bg-slate-500'}`} />
+                <span className="text-[11px] text-slate-400">
+                  {generatedCount} / {generatable.length}명 생성 완료
+                </span>
+              </div>
+              {generatedCount > 0 && (
+                <span className="text-[10px] text-slate-500">
+                  총 {generatable.filter(r => reportContent[r.candidate.id]?.content).reduce((s, r) => s + getImageCount(reportContent[r.candidate.id]), 0)}장 이미지
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* 일괄 액션 버튼 */}
+          <div className="flex flex-col gap-2 sm:items-end">
+            <Button
+              size="sm"
+              onClick={handleBatchGenerate}
+              disabled={generating != null || batchGenerating || allGenerated}
+              className="whitespace-nowrap"
+            >
+              {batchGenerating
+                ? '일괄 생성 중...'
+                : allGenerated
+                  ? '전원 생성 완료'
+                  : generatedCount > 0
+                    ? `미생성 ${generatable.length - generatedCount}명 일괄 생성`
+                    : `전체 ${generatable.length}명 일괄 생성`
+              }
+            </Button>
+            {generatedCount > 0 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleBatchDownload}
+                disabled={generating != null || batchGenerating}
+                className="whitespace-nowrap"
+              >
+                전체 다운로드 (.docx × {generatedCount})
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {candidateResults.map(result => (
-          <Card key={result.candidate.id} className="!p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <div className="font-bold text-white">{result.candidate.name}</div>
-                <div className="text-xs text-slate-500">
-                  {result.candidate.team} · {result.evalCount}명 평가완료
-                  {result.finalAvg != null && ` · ${result.finalAvg.toFixed(1)}점`}
+      {/* ━━━━━━ 진행 상태 ━━━━━━ */}
+      {(generating || batchGenerating) && progress && (
+        <Card className="!p-4 border border-brand-500/30 bg-brand-500/5 animate-pulse-slow">
+          <div className="flex items-center gap-3">
+            <Spinner />
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-semibold text-white">{progress.candidateName || ''}</span>
+                <span className="text-[10px] text-slate-500">{progress.message}</span>
+              </div>
+              <div className="w-full bg-surface-500/30 rounded-full h-2.5">
+                <div
+                  className="bg-gradient-to-r from-brand-500 to-brand-400 h-2.5 rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${Math.max(8, (progress.step / progress.total) * 100)}%` }}
+                />
+              </div>
+              {progress.batchProgress && (
+                <div className="text-[10px] text-slate-500 mt-1">
+                  전체 진행: {progress.batchProgress.current} / {progress.batchProgress.total}명
                 </div>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => handleGenerate(result)}
-                disabled={generating != null || !result.evaluatorDetails?.some(ed => ed.isComplete)}
-              >
-                {generating === result.candidate.id ? '생성 중...' : '보고서 생성'}
-              </Button>
+              )}
             </div>
-            {reportContent[result.candidate.id]?.content && (
-              <div className="flex gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setSelectedCandidate(selectedCandidate === result.candidate.id ? null : result.candidate.id)}
-                >
-                  미리보기
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDownload(result.candidate.id, result.candidate.name)}
-                >
-                  다운로드 (.docx)
-                </Button>
-              </div>
-            )}
-          </Card>
-        ))}
-      </div>
-
-      {selectedCandidate && reportContent[selectedCandidate]?.content && (
-        <Card className="!p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-white">보고서 미리보기</h3>
-            <Button variant="ghost" size="sm" onClick={() => setSelectedCandidate(null)}>닫기</Button>
           </div>
-          <pre className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-sans max-h-[400px] overflow-y-auto">
-            {reportContent[selectedCandidate].content}
-          </pre>
         </Card>
       )}
+
+      {/* ━━━━━━ 피평가자별 카드 ━━━━━━ */}
+      <div className="space-y-3">
+        {candidateResults.map(result => {
+          const data = reportContent[result.candidate.id];
+          const isGenerating = generating === result.candidate.id;
+          const hasReport = !!data?.content;
+          const canGenerate = result.evaluatorDetails?.some(ed => ed.isComplete && !ed.isSameTeam);
+          const isSelected = selectedCandidate === result.candidate.id;
+
+          return (
+            <Card
+              key={result.candidate.id}
+              className={`!p-0 overflow-hidden transition-all duration-300 ${
+                hasReport ? 'border border-emerald-500/20' : ''
+              } ${isGenerating ? 'border border-brand-500/30 bg-brand-500/3' : ''}`}
+            >
+              {/* ── 카드 헤더 ── */}
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 sm:gap-4 px-5 py-4">
+                {/* 상태 인디케이터 */}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shrink-0 ${
+                  hasReport ? 'bg-emerald-500/15 text-emerald-400' :
+                  isGenerating ? 'bg-brand-500/15 text-brand-400 animate-pulse' :
+                  canGenerate ? 'bg-surface-300 text-slate-400' :
+                  'bg-surface-300/50 text-slate-600'
+                }`}>
+                  {hasReport ? '✓' : isGenerating ? '⟳' : canGenerate ? result.candidate.name[0] : '—'}
+                </div>
+
+                {/* 이름 + 정보 */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-white text-base">{result.candidate.name}</span>
+                    <span className="text-xs text-slate-500">{result.candidate.team}</span>
+                    {hasReport && <Badge variant="green">완료</Badge>}
+                    {!canGenerate && <Badge variant="muted">평가 미완료</Badge>}
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5 text-[11px] text-slate-500">
+                    <span>{result.evalCount}명 평가완료</span>
+                    {result.finalAvg != null && (
+                      <span className={result.pass ? 'text-emerald-400' : result.pass === false ? 'text-red-400' : ''}>
+                        {result.finalAvg.toFixed(1)}점 {result.pass ? '합격' : result.pass === false ? '미달' : ''}
+                      </span>
+                    )}
+                    {data?.generatedAt && (
+                      <span className="text-slate-600">생성: {data.generatedAt}</span>
+                    )}
+                    {data?.usedEngine && (
+                      <span className="text-brand-400/50">{data.usedEngine}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 액션 버튼들 */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {hasReport && (
+                    <>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setSelectedCandidate(isSelected ? null : result.candidate.id)}
+                        className="min-h-[36px]"
+                      >
+                        {isSelected ? '닫기' : '미리보기'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleDownload(result.candidate.id, result.candidate.name)}
+                        className="min-h-[36px]"
+                      >
+                        다운로드
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    variant={hasReport ? 'ghost' : 'default'}
+                    size="sm"
+                    onClick={() => handleGenerate(result)}
+                    disabled={generating != null || batchGenerating || !canGenerate}
+                    className="min-h-[36px]"
+                  >
+                    {isGenerating ? '생성 중...' : hasReport ? '재생성' : '보고서 생성'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* ── 보고서 메타 정보 바 ── */}
+              {hasReport && (
+                <div className="px-5 py-2 bg-surface-300/30 border-t border-surface-500/10 flex items-center gap-4 text-[10px] text-slate-500">
+                  <span>이미지 {getImageCount(data)}장</span>
+                  <span>·</span>
+                  <span>{data.content.length.toLocaleString()}자</span>
+                  <span>·</span>
+                  <span>{data.content.includes('— 보고서 끝 —') ? '작성 완료' : '⚠ 일부 미완성'}</span>
+                  {data.content.split(/^## /m).length - 1 > 0 && (
+                    <>
+                      <span>·</span>
+                      <span>섹션 {data.content.split(/^## /m).length - 1}개</span>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ── 미리보기 (확장) ── */}
+              {isSelected && hasReport && (
+                <div className="border-t border-surface-500/20">
+                  <div className="flex items-center justify-between px-5 py-3 bg-surface-300/20">
+                    <h3 className="text-sm font-bold text-white">
+                      {result.candidate.name} 평가보고서 미리보기
+                    </h3>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleDownload(result.candidate.id, result.candidate.name)}
+                      >
+                        Word 다운로드
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedCandidate(null)}>
+                        접기
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="px-5 py-4 max-h-[70vh] overflow-y-auto">
+                    <div className="prose prose-invert prose-sm max-w-none">
+                      <pre className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-sans bg-transparent border-none p-0 m-0">
+                        {data.content}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
