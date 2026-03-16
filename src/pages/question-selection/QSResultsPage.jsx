@@ -49,6 +49,10 @@ import {
 } from '@/lib/qsAssignmentStore';
 
 import { useStore } from '@/lib/store';
+import {
+  getQsCandidateSession,
+  clearQsCandidateSession,
+} from '@/data/qsCandidates';
 
 const ALL_EVALUATORS = ['나동환', '권영도', '권오경', '김홍', '박성현', '윤덕상', '하상현'];
 const CATEGORY_KEYS = Object.keys(QS_CATEGORIES);
@@ -63,6 +67,22 @@ const ADMINS = [
 
 export default function QSResultsPage() {
   const navigate = useNavigate();
+
+  // ─── 피평가자 세션 확인 ───
+  const candidateSession = getQsCandidateSession();
+
+  // ─── 피평가자 전용 뷰 ───
+  if (candidateSession) {
+    return (
+      <CandidateAssignmentView
+        candidate={candidateSession}
+        onLogout={() => {
+          clearQsCandidateSession();
+          navigate('/question-selection');
+        }}
+      />
+    );
+  }
 
   // 투표 데이터
   const [status, setStatus] = useState(null);
@@ -170,6 +190,12 @@ export default function QSResultsPage() {
 
   // ── 8단계: 인증서 수여
   const [showCertPanel, setShowCertPanel] = useState(false);
+
+  // ── 랜덤 배정 출제 확정 버튼 이중인증 모달
+  const [showAssignConfirmAuth, setShowAssignConfirmAuth] = useState(false);
+  const [assignConfirmPassword, setAssignConfirmPassword] = useState('');
+  const [assignConfirmText, setAssignConfirmText] = useState('');
+  const [assignConfirmError, setAssignConfirmError] = useState('');
 
   // ── 상세 평가 데이터 연동 (store.js - Supabase 평가시스템)
   const evalStoreInitialize = useStore(s => s.initialize);
@@ -1746,7 +1772,12 @@ export default function QSResultsPage() {
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => navigate('/question-selection/assignment-confirm')}
+                  onClick={() => {
+                    setAssignConfirmPassword('');
+                    setAssignConfirmText('');
+                    setAssignConfirmError('');
+                    setShowAssignConfirmAuth(true);
+                  }}
                   className="px-4 py-2 rounded-xl text-sm font-black text-stone-900 transition hover:opacity-90 active:scale-95 border-2 border-stone-800/40 shadow-md"
                   style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' }}
                 >
@@ -3605,7 +3636,287 @@ export default function QSResultsPage() {
       )}
 
       {/* 빌드 버전 (배포 검증용) */}
-      <p className="text-[10px] text-slate-600 text-center py-4">빌드: 2026-03-15-v3-eval-linked</p>
+      <p className="text-[10px] text-slate-600 text-center py-4">빌드: 2026-03-17-v4-finalize</p>
+
+      {/* ═══════════════════════════════════════════
+          랜덤 배정 출제 확정 — 관리자 이중인증 모달
+      ═══════════════════════════════════════════ */}
+      {showAssignConfirmAuth && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl border"
+            style={{ borderColor: 'rgb(163,120,55)', background: 'linear-gradient(180deg, #1a1207 0%, #0f0a03 100%)' }}>
+
+            {/* 헤더 */}
+            <div className="px-6 py-5 text-center"
+              style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}>
+              <div className="text-3xl mb-1">📋</div>
+              <h3 className="text-lg font-black text-stone-900">랜덤 배정 출제 확정</h3>
+              <p className="text-xs text-stone-700 mt-1 font-medium">
+                관리자 인증 후 확정 페이지로 이동합니다
+              </p>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {/* 1단계: 관리자 비밀번호 */}
+              <div>
+                <label className="block text-xs font-bold text-amber-400 mb-1.5">
+                  1단계 — 관리자 비밀번호
+                </label>
+                <input
+                  type="password"
+                  value={assignConfirmPassword}
+                  onChange={(e) => { setAssignConfirmPassword(e.target.value); setAssignConfirmError(''); }}
+                  placeholder="비밀번호 입력"
+                  autoFocus
+                  className="w-full px-4 py-3 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 placeholder-slate-500 text-sm outline-none focus:border-amber-500 transition"
+                />
+              </div>
+
+              {/* 2단계: 확인 텍스트 입력 */}
+              <div>
+                <label className="block text-xs font-bold text-amber-400 mb-1.5">
+                  2단계 — 확인 문구 입력 :{' '}
+                  <span className="text-yellow-300 font-black">"배정확정"</span>
+                </label>
+                <input
+                  type="text"
+                  value={assignConfirmText}
+                  onChange={(e) => { setAssignConfirmText(e.target.value); setAssignConfirmError(''); }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const VALID_PASSWORDS = ['ksa2026', 'lhk2026'];
+                      if (!VALID_PASSWORDS.includes(assignConfirmPassword)) {
+                        setAssignConfirmError('관리자 비밀번호가 올바르지 않습니다.');
+                        return;
+                      }
+                      if (assignConfirmText !== '배정확정') {
+                        setAssignConfirmError('"배정확정"을 정확히 입력해 주세요.');
+                        return;
+                      }
+                      setShowAssignConfirmAuth(false);
+                      navigate('/question-selection/assignment-confirm');
+                    }
+                  }}
+                  placeholder="배정확정"
+                  className="w-full px-4 py-3 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 placeholder-slate-500 text-sm outline-none focus:border-amber-500 transition"
+                />
+              </div>
+
+              {/* 에러 */}
+              {assignConfirmError && (
+                <div className="px-3 py-2.5 rounded-lg bg-red-900/30 border border-red-700/50 text-xs text-red-400 font-medium">
+                  ⚠️ {assignConfirmError}
+                </div>
+              )}
+
+              {/* 버튼 */}
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setShowAssignConfirmAuth(false)}
+                  className="flex-1 px-4 py-3 rounded-xl text-sm font-bold bg-slate-700 text-slate-300 hover:bg-slate-600 transition"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={() => {
+                    const VALID_PASSWORDS = ['ksa2026', 'lhk2026'];
+                    if (!VALID_PASSWORDS.includes(assignConfirmPassword)) {
+                      setAssignConfirmError('관리자 비밀번호가 올바르지 않습니다.');
+                      return;
+                    }
+                    if (assignConfirmText !== '배정확정') {
+                      setAssignConfirmError('"배정확정"을 정확히 입력해 주세요.');
+                      return;
+                    }
+                    setShowAssignConfirmAuth(false);
+                    navigate('/question-selection/assignment-confirm');
+                  }}
+                  disabled={!assignConfirmPassword || !assignConfirmText}
+                  className="flex-1 px-4 py-3 rounded-xl text-sm font-black text-stone-900 disabled:opacity-40 disabled:cursor-not-allowed transition hover:opacity-90"
+                  style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
+                >
+                  🔐 확정 페이지 이동
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// 피평가자 전용 뷰 — 본인 배정 출제문제 확인 + 다운로드
+// ═══════════════════════════════════════════════════════════════
+function CandidateAssignmentView({ candidate, onLogout }) {
+  const [assignment, setAssignment] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    loadAssignmentsHybrid().then((res) => {
+      setLoading(false);
+      if (res?.assignments?.length > 0) {
+        const myAssignment = res.assignments.find((a) => a.candidateId === candidate.id);
+        setAssignment(myAssignment || null);
+      }
+    }).catch((err) => {
+      setLoading(false);
+      setError(err?.message || '배정 데이터를 불러올 수 없습니다.');
+    });
+  }, [candidate.id]);
+
+  const examUrl = assignment
+    ? `${window.location.origin}/question-selection/exam/${encodeToken(assignment)}`
+    : '';
+
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(examUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const CATEGORY_CONFIG = {
+    stock_transfer:    { label: '주식이동',  icon: '📊', color: 'text-blue-400',    bg: 'bg-blue-900/20',    border: 'border-blue-700/50' },
+    nominee_stock:     { label: '차명주식',  icon: '🔐', color: 'text-purple-400',  bg: 'bg-purple-900/20',  border: 'border-purple-700/50' },
+    temporary_payment: { label: '가지급금',  icon: '💰', color: 'text-emerald-400', bg: 'bg-emerald-900/20', border: 'border-emerald-700/50' },
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-6">
+      {/* 헤더 */}
+      <div
+        className="rounded-2xl overflow-hidden mb-6 shadow-2xl border-2"
+        style={{ borderColor: 'rgb(214,173,101)', background: 'linear-gradient(135deg, #1a1207 0%, #292010 100%)' }}
+      >
+        <div
+          className="px-6 py-5 flex items-center justify-between"
+          style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl font-black"
+              style={{ background: 'rgba(30,20,5,0.4)', color: '#1a1207' }}>
+              {candidate.name.charAt(0)}
+            </div>
+            <div>
+              <h1 className="text-lg font-black text-stone-900">{candidate.name}</h1>
+              <p className="text-xs text-stone-700 font-medium">{candidate.team}</p>
+            </div>
+          </div>
+          <button
+            onClick={onLogout}
+            className="px-4 py-2 rounded-lg bg-stone-800/40 text-stone-800 text-xs font-bold hover:bg-stone-800/60 transition"
+          >
+            로그아웃
+          </button>
+        </div>
+
+        <div className="px-6 py-4">
+          <div className="text-xs font-bold mb-1" style={{ color: 'rgb(214,173,101)' }}>
+            🎲 2차 출제 — 나의 배정 문제
+          </div>
+          <p className="text-[11px] text-stone-500">
+            아래 3문제를 모두 준비하세요. 시험 당일 평가위원회에서 1문제를 최종 추첨합니다.
+          </p>
+        </div>
+      </div>
+
+      {/* 로딩 */}
+      {loading && (
+        <div className="text-center py-16">
+          <div className="text-4xl mb-4">🎲</div>
+          <p className="text-slate-400">배정 데이터를 불러오는 중...</p>
+        </div>
+      )}
+
+      {/* 에러 */}
+      {error && (
+        <div className="rounded-xl border border-red-700/50 bg-red-900/20 p-6 text-center">
+          <p className="text-red-400 text-sm mb-3">{error}</p>
+          <button onClick={() => window.location.reload()}
+            className="text-xs text-amber-400 hover:text-amber-300 underline">
+            새로고침
+          </button>
+        </div>
+      )}
+
+      {/* 배정 없음 */}
+      {!loading && !error && !assignment && (
+        <div className="rounded-2xl border-2 border-dashed border-amber-700/50 p-10 text-center bg-amber-950/20">
+          <div className="text-5xl mb-4">⏳</div>
+          <h2 className="text-lg font-bold text-slate-200 mb-2">아직 배정이 완료되지 않았습니다</h2>
+          <p className="text-slate-400 text-sm">
+            관리자가 랜덤 배정을 실행한 후 다시 확인해 주세요.
+          </p>
+        </div>
+      )}
+
+      {/* 배정 결과 */}
+      {!loading && !error && assignment && (
+        <div className="space-y-4">
+          {/* 3문제 카드 */}
+          {['stock_transfer', 'nominee_stock', 'temporary_payment'].map((catKey) => {
+            const cfg = CATEGORY_CONFIG[catKey];
+            const qId = assignment[catKey];
+            const q = QS_QUESTIONS[qId];
+            return (
+              <div key={catKey}
+                className={`rounded-2xl border p-5 ${cfg.bg} ${cfg.border}`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-lg">{cfg.icon}</span>
+                  <span className={`text-xs font-bold ${cfg.color}`}>{cfg.label}</span>
+                  <span className={`text-xs font-black ${cfg.color} ml-auto`}>#{qId}</span>
+                </div>
+                <h3 className="text-base font-bold text-slate-100 mb-1">{q?.title || `문제 #${qId}`}</h3>
+                {q?.description && (
+                  <p className="text-xs text-slate-400 leading-relaxed">{q.description}</p>
+                )}
+              </div>
+            );
+          })}
+
+          {/* 출제 확인 URL + 다운로드 */}
+          <div className="rounded-2xl border border-amber-800/50 bg-amber-950/30 p-5">
+            <p className="text-xs font-bold text-amber-400 mb-2">🔗 출제 확인 개인 URL</p>
+            <div className="flex gap-2 items-center bg-slate-900/60 rounded-xl px-4 py-3 border border-slate-700/50 mb-3">
+              <p className="text-xs text-slate-300 flex-1 break-all font-mono">{examUrl}</p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={handleCopyUrl}
+                className="flex-1 py-3 rounded-xl text-sm font-bold border transition flex items-center justify-center gap-2"
+                style={copied
+                  ? { background: '#065f46', borderColor: '#065f46', color: '#6ee7b7' }
+                  : { background: 'rgba(214,173,101,0.12)', borderColor: 'rgb(163,120,55)', color: 'rgb(214,173,101)' }}
+              >
+                {copied ? '✅ 복사 완료' : '📋 URL 복사'}
+              </button>
+              <a
+                href={examUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 py-3 rounded-xl text-sm font-bold text-stone-900 transition hover:opacity-90 flex items-center justify-center gap-2"
+                style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
+              >
+                📄 문제 확인 →
+              </a>
+            </div>
+          </div>
+
+          {/* 안내 박스 */}
+          <div className="rounded-xl border border-slate-700/40 bg-slate-800/40 p-4 text-xs text-slate-400 leading-relaxed space-y-1">
+            <p className="font-bold text-slate-300 mb-1.5">📌 중요 안내</p>
+            <p>• 위 3문제를 모두 충분히 준비해 주세요.</p>
+            <p>• 시험 당일 아침 평가위원회에서 <span className="text-amber-400 font-bold">1문제를 최종 추첨</span>합니다.</p>
+            <p>• 개인 URL을 통해 언제든지 배정 문제를 확인할 수 있습니다.</p>
+            <p>• 문의사항은 담당 코치에게 연락해 주세요.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

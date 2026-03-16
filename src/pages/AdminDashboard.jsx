@@ -32,7 +32,7 @@ export default function AdminDashboard() {
     archives, archiveDetail, updateCriteriaItem, addCriteriaItem,
     setSelectedPeriod,     createPeriod, setPeriodStatus, addCandidate,
     addPeriodEvaluator, removePeriodEvaluator,
-    allEvaluators,
+    allEvaluators, finalizePeriod, unfinalizePeriod,
   } = useStore();
 
   const [activeTab, setActiveTab] = useState('overview');
@@ -43,6 +43,19 @@ export default function AdminDashboard() {
   // ─── 점수 산정 방식 토글 ───
   // 'default' = 전체 평균  |  'trimmed' = 최고·최저 제외 평균
   const [scoringMethod, setScoringMethod] = useState('default');
+
+  // ─── 최종평가결과 마감 관련 상태 ───
+  const isFinalized = !!periodInfo?.finalized_at;
+  const [finalizeModalOpen, setFinalizeModalOpen] = useState(false);
+  const [finalizePassword, setFinalizePassword] = useState('');
+  const [finalizeError, setFinalizeError] = useState('');
+  const [isFinalizingAction, setIsFinalizingAction] = useState(false);
+
+  // ─── 마감 해제(수정) 모달 상태 ───
+  const [unfinalizeModalOpen, setUnfinalizeModalOpen] = useState(false);
+  const [unfinalizePassword, setUnfinalizePassword] = useState('');
+  const [unfinalizeConfirmText, setUnfinalizeConfirmText] = useState('');
+  const [unfinalizeError, setUnfinalizeError] = useState('');
 
   useEffect(() => {
     if (activeTab === 'audit') loadAuditLog();
@@ -148,6 +161,61 @@ export default function AdminDashboard() {
     }
   };
 
+  // ─── 최종평가결과 마감 핸들러 ───
+  const FINALIZE_PASSWORDS = ['ksa2026', 'lhk2026'];
+
+  const handleFinalizeOpen = () => {
+    setFinalizePassword('');
+    setFinalizeError('');
+    setFinalizeModalOpen(true);
+  };
+
+  const handleFinalizeConfirm = async () => {
+    if (!FINALIZE_PASSWORDS.includes(finalizePassword)) {
+      setFinalizeError('관리자 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    setIsFinalizingAction(true);
+    try {
+      await finalizePeriod(selectedPeriodId, finalizePassword === 'ksa2026' ? 'ksa' : 'lhk');
+      setFinalizeModalOpen(false);
+      toast.success('최종평가결과가 마감되었습니다.');
+    } catch (err) {
+      setFinalizeError('마감 처리 실패: ' + (err?.message || ''));
+    } finally {
+      setIsFinalizingAction(false);
+    }
+  };
+
+  // ─── 마감 해제 핸들러 (이중 인증) ───
+  const handleUnfinalizeOpen = () => {
+    setUnfinalizePassword('');
+    setUnfinalizeConfirmText('');
+    setUnfinalizeError('');
+    setUnfinalizeModalOpen(true);
+  };
+
+  const handleUnfinalizeConfirm = async () => {
+    if (!FINALIZE_PASSWORDS.includes(unfinalizePassword)) {
+      setUnfinalizeError('관리자 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    if (unfinalizeConfirmText !== '수정을 확인한다') {
+      setUnfinalizeError('"수정을 확인한다"를 정확히 입력해 주세요.');
+      return;
+    }
+    setIsFinalizingAction(true);
+    try {
+      await unfinalizePeriod(selectedPeriodId);
+      setUnfinalizeModalOpen(false);
+      toast.success('마감이 해제되었습니다. 데이터를 수정할 수 있습니다.');
+    } catch (err) {
+      setUnfinalizeError('마감 해제 실패: ' + (err?.message || ''));
+    } finally {
+      setIsFinalizingAction(false);
+    }
+  };
+
   return (
     <>
     <div className="max-w-[1200px] mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-8 sm:pb-6">
@@ -178,7 +246,7 @@ export default function AdminDashboard() {
               ))}
             </select>
           )}
-          <Button variant="danger" size="sm" onClick={handleResetClick} className="min-h-[44px] sm:min-h-0">초기화</Button>
+          <Button variant="danger" size="sm" onClick={handleResetClick} disabled={isFinalized} className="min-h-[44px] sm:min-h-0">{isFinalized ? '🔒 초기화' : '초기화'}</Button>
           <Button variant="secondary" size="sm" onClick={logout} className="min-h-[44px] sm:min-h-0">로그아웃</Button>
         </div>
       </div>
@@ -203,6 +271,30 @@ export default function AdminDashboard() {
       {/* ═══ TAB: Overview ═══ */}
       {activeTab === 'overview' && (
         <div>
+          {/* ── 마감 상태 배너 ── */}
+          {isFinalized && (
+            <div className="mb-6 p-4 rounded-xl bg-emerald-900/30 border-2 border-emerald-500/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-lg flex-shrink-0">
+                  🔒
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-emerald-300">최종평가결과 마감 완료</div>
+                  <div className="text-[11px] text-emerald-400/70 mt-0.5">
+                    마감일: {new Date(periodInfo.finalized_at).toLocaleString('ko-KR')}
+                    {periodInfo.finalized_by && ` · 마감자: ${periodInfo.finalized_by === 'ksa' ? '강선애' : periodInfo.finalized_by === 'lhk' ? '이후경' : periodInfo.finalized_by}`}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleUnfinalizeOpen}
+                className="px-4 py-2.5 min-h-[44px] sm:min-h-0 rounded-lg bg-amber-600/80 hover:bg-amber-600 text-white text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0"
+              >
+                🔓 마감 해제 (수정)
+              </button>
+            </div>
+          )}
+
           {/* Stats Row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <StatBox label="총 응시자" value={stats.total} unit="명" variant="brand" />
@@ -214,7 +306,10 @@ export default function AdminDashboard() {
           {/* Candidate Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             {candidateResults.map(r => (
-              <Card key={r.candidate.id} className="text-center !p-5">
+              <Card key={r.candidate.id} className={`text-center !p-5 ${isFinalized ? 'ring-1 ring-emerald-500/20' : ''}`}>
+                {isFinalized && (
+                  <div className="absolute top-2 right-2 text-emerald-400/50 text-xs">🔒</div>
+                )}
                 <div className="text-base font-bold text-white mb-1">{r.candidate.name}</div>
                 <div className="text-[11px] text-slate-500 mb-4">{r.candidate.team}</div>
                 <div className="flex justify-center mb-3">
@@ -251,7 +346,10 @@ export default function AdminDashboard() {
 
           {/* Bonus Scores */}
           <SectionHeader>치프 역량 강화 교육 이수 가점 (담당코치: 하상현 수석, 최대 10점)</SectionHeader>
-          <Card className="mb-6 !p-4 sm:!p-6">
+          <Card className={`mb-6 !p-4 sm:!p-6 ${isFinalized ? 'opacity-60 pointer-events-none' : ''}`}>
+            {isFinalized && (
+              <div className="text-[11px] text-emerald-400/80 font-semibold mb-3 flex items-center gap-1">🔒 마감 상태 — 수정 불가</div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {candidates.map(cand => (
                 <div key={cand.id} className="p-4 rounded-xl bg-surface-100 border border-surface-500/30">
@@ -260,6 +358,7 @@ export default function AdminDashboard() {
                     value={bonusScores[cand.id] ?? null}
                     max={10}
                     onChange={(v) => handleBonusChange(cand.id, v)}
+                    disabled={isFinalized}
                   />
                 </div>
               ))}
@@ -267,11 +366,11 @@ export default function AdminDashboard() {
           </Card>
 
           {/* ── 점수 산정 방식 선택 + 공식 ── */}
-          <Card className="bg-surface-300/50">
+          <Card className="bg-surface-300/50 mb-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
               <div className="text-sm font-bold text-white">📐 점수 산정 방식</div>
               {/* Toggle Buttons */}
-              <div className="flex rounded-lg overflow-hidden border border-surface-500/40">
+              <div className={`flex rounded-lg overflow-hidden border border-surface-500/40 ${isFinalized ? 'opacity-60 pointer-events-none' : ''}`}>
                 <button
                   onClick={() => setScoringMethod('default')}
                   className={`px-3 py-1.5 text-xs font-semibold transition-all ${
@@ -313,6 +412,26 @@ export default function AdminDashboard() {
               </div>
             )}
           </Card>
+
+          {/* ── 최종평가결과 마감 버튼 ── */}
+          {!isFinalized && (
+            <Card className="bg-gradient-to-r from-surface-200 to-surface-300/80 border-2 border-dashed border-surface-500/50">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <div className="text-sm font-bold text-white mb-1">📋 최종평가결과 마감</div>
+                  <div className="text-[11px] text-slate-400 leading-relaxed">
+                    모든 평가가 완료되면 마감 처리하여 데이터를 잠금합니다. 마감 후에는 가점·합격판정·점수산정방식 변경이 불가합니다.
+                  </div>
+                </div>
+                <button
+                  onClick={handleFinalizeOpen}
+                  className="px-6 py-3 min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2 flex-shrink-0"
+                >
+                  🔒 최종 마감 실행
+                </button>
+              </div>
+            </Card>
+          )}
         </div>
       )}
 
@@ -390,16 +509,16 @@ export default function AdminDashboard() {
                       variant={result.candidate.status === 'passed' ? 'success' : 'ghost'}
                       size="sm"
                       onClick={() => handleJudge(result.candidate.id, true)}
-                      disabled={result.finalAvg == null}
+                      disabled={result.finalAvg == null || isFinalized}
                       className="min-h-[40px] sm:min-h-0"
-                    >합격</Button>
+                    >{isFinalized && result.candidate.status === 'passed' ? '🔒 합격' : '합격'}</Button>
                     <Button
                       variant={result.candidate.status === 'failed' ? 'danger' : 'ghost'}
                       size="sm"
                       onClick={() => handleJudge(result.candidate.id, false)}
-                      disabled={result.finalAvg == null}
+                      disabled={result.finalAvg == null || isFinalized}
                       className="min-h-[40px] sm:min-h-0"
-                    >불합격</Button>
+                    >{isFinalized && result.candidate.status === 'failed' ? '🔒 불합격' : '불합격'}</Button>
                   </div>
 
                   <span className={`text-slate-500 text-sm transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>›</span>
@@ -716,6 +835,122 @@ export default function AdminDashboard() {
       onConfirm={handleResetConfirm}
       isResetting={isResetting}
     />
+
+    {/* ═══ 최종평가결과 마감 모달 ═══ */}
+    {finalizeModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="w-full max-w-md bg-surface-200 rounded-2xl border border-surface-500/50 shadow-2xl p-6">
+          <div className="text-center mb-5">
+            <div className="text-3xl mb-2">🔒</div>
+            <h3 className="text-lg font-bold text-white">최종평가결과 마감</h3>
+            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+              마감 후에는 가점, 합격/불합격 판정, 점수 산정 방식을<br/>
+              변경할 수 없습니다. 관리자 비밀번호를 입력하세요.
+            </p>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-xs font-semibold text-slate-400 mb-1.5">관리자 비밀번호</label>
+            <input
+              type="password"
+              value={finalizePassword}
+              onChange={(e) => { setFinalizePassword(e.target.value); setFinalizeError(''); }}
+              onKeyDown={(e) => e.key === 'Enter' && handleFinalizeConfirm()}
+              placeholder="비밀번호 입력"
+              className="w-full px-4 py-3 rounded-lg bg-surface-100 border border-surface-500/50 text-white text-sm outline-none focus:border-emerald-500 transition-colors"
+              autoFocus
+            />
+          </div>
+
+          {finalizeError && (
+            <div className="mb-4 p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium">
+              {finalizeError}
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setFinalizeModalOpen(false)}
+              className="flex-1 px-4 py-3 rounded-lg bg-surface-300 text-slate-300 text-sm font-semibold hover:bg-surface-400 transition-colors"
+            >
+              취소
+            </button>
+            <button
+              onClick={handleFinalizeConfirm}
+              disabled={isFinalizingAction || !finalizePassword}
+              className="flex-1 px-4 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors"
+            >
+              {isFinalizingAction ? '처리 중...' : '마감 확정'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ═══ 마감 해제(수정) 이중 인증 모달 ═══ */}
+    {unfinalizeModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="w-full max-w-md bg-surface-200 rounded-2xl border border-surface-500/50 shadow-2xl p-6">
+          <div className="text-center mb-5">
+            <div className="text-3xl mb-2">⚠️</div>
+            <h3 className="text-lg font-bold text-amber-300">마감 해제 — 이중 인증</h3>
+            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+              확정된 평가 결과를 수정하려면 관리자 비밀번호 입력 후<br/>
+              <span className="text-amber-400 font-bold">"수정을 확인한다"</span>를 정확히 입력해 주세요.
+            </p>
+          </div>
+
+          <div className="space-y-4 mb-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5">1단계: 관리자 비밀번호</label>
+              <input
+                type="password"
+                value={unfinalizePassword}
+                onChange={(e) => { setUnfinalizePassword(e.target.value); setUnfinalizeError(''); }}
+                placeholder="비밀번호 입력"
+                className="w-full px-4 py-3 rounded-lg bg-surface-100 border border-surface-500/50 text-white text-sm outline-none focus:border-amber-500 transition-colors"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1.5">
+                2단계: 확인 문구 입력 — <span className="text-amber-400">"수정을 확인한다"</span>
+              </label>
+              <input
+                type="text"
+                value={unfinalizeConfirmText}
+                onChange={(e) => { setUnfinalizeConfirmText(e.target.value); setUnfinalizeError(''); }}
+                onKeyDown={(e) => e.key === 'Enter' && handleUnfinalizeConfirm()}
+                placeholder="수정을 확인한다"
+                className="w-full px-4 py-3 rounded-lg bg-surface-100 border border-surface-500/50 text-white text-sm outline-none focus:border-amber-500 transition-colors"
+              />
+            </div>
+          </div>
+
+          {unfinalizeError && (
+            <div className="mb-4 p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium">
+              {unfinalizeError}
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setUnfinalizeModalOpen(false)}
+              className="flex-1 px-4 py-3 rounded-lg bg-surface-300 text-slate-300 text-sm font-semibold hover:bg-surface-400 transition-colors"
+            >
+              취소
+            </button>
+            <button
+              onClick={handleUnfinalizeConfirm}
+              disabled={isFinalizingAction || !unfinalizePassword || !unfinalizeConfirmText}
+              className="flex-1 px-4 py-3 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors"
+            >
+              {isFinalizingAction ? '처리 중...' : '마감 해제'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   </>
   );
 }

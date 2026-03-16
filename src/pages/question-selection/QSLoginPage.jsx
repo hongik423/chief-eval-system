@@ -8,6 +8,11 @@ import {
   hasCustomPassword,
 } from '@/data/qsEvaluators';
 import { QS_PDF_URL } from '@/data/qsQuestions';
+import {
+  QS_CANDIDATES,
+  findQsCandidate,
+  setQsCandidateSession,
+} from '@/data/qsCandidates';
 import { getVotingConfig } from '@/lib/qsVoteStore';
 import {
   EXAM_DATE,
@@ -22,10 +27,21 @@ import { ADMIN_ID, ADMIN_PASSWORD } from '@/lib/constants';
 
 export default function QSLoginPage() {
   const navigate = useNavigate();
+
+  // ─── 로그인 모드 탭: 'evaluator' | 'candidate' ───
+  const [loginMode, setLoginMode] = useState('evaluator');
+
+  // ─── 평가위원 로그인 ───
   const [selectedId, setSelectedId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // ─── 피평가자 로그인 ───
+  const [candidateId, setCandidateId] = useState('');
+  const [candidatePassword, setCandidatePassword] = useState('');
+  const [candidateError, setCandidateError] = useState('');
+  const [candidateLoading, setCandidateLoading] = useState(false);
 
   // 공지 모달
   const [showNotice, setShowNotice] = useState(true);
@@ -90,6 +106,25 @@ export default function QSLoginPage() {
         setError('비밀번호가 올바르지 않습니다.');
       }
       setLoading(false);
+    }, 400);
+  };
+
+  // 피평가자 로그인 핸들러
+  const handleCandidateLogin = (e) => {
+    e.preventDefault();
+    setCandidateError('');
+    if (!candidateId) { setCandidateError('이름을 선택해주세요.'); return; }
+    if (!candidatePassword) { setCandidateError('비밀번호를 입력해주세요.'); return; }
+    setCandidateLoading(true);
+    setTimeout(() => {
+      const found = findQsCandidate(candidateId, candidatePassword);
+      if (found) {
+        setQsCandidateSession({ id: found.id, name: found.name, team: found.team });
+        navigate('/question-selection/results');
+      } else {
+        setCandidateError('비밀번호가 올바르지 않습니다.');
+      }
+      setCandidateLoading(false);
     }, 400);
   };
 
@@ -624,7 +659,120 @@ export default function QSLoginPage() {
           </div>
         </div>
 
-        {/* 로그인 폼 */}
+        {/* ── 로그인 모드 탭 ── */}
+        <div className="px-8 pt-5 pb-0">
+          <div className="flex rounded-xl overflow-hidden border border-slate-600">
+            <button
+              type="button"
+              onClick={() => setLoginMode('evaluator')}
+              className={`flex-1 py-2.5 text-sm font-bold transition-all ${
+                loginMode === 'evaluator'
+                  ? 'text-stone-900'
+                  : 'bg-slate-700 text-slate-400 hover:text-slate-200'
+              }`}
+              style={loginMode === 'evaluator'
+                ? { background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }
+                : {}}
+            >
+              🧑‍⚖️ 평가위원 로그인
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginMode('candidate')}
+              className={`flex-1 py-2.5 text-sm font-bold border-l border-slate-600 transition-all ${
+                loginMode === 'candidate'
+                  ? 'text-stone-900'
+                  : 'bg-slate-700 text-slate-400 hover:text-slate-200'
+              }`}
+              style={loginMode === 'candidate'
+                ? { background: 'linear-gradient(135deg, #064e3b 0%, #065f46 100%)', color: '#6ee7b7' }
+                : {}}
+            >
+              👤 피평가자 로그인
+            </button>
+          </div>
+        </div>
+
+        {/* ── 피평가자 로그인 폼 ── */}
+        {loginMode === 'candidate' && (
+          <form onSubmit={handleCandidateLogin} className="px-8 py-6 space-y-5">
+            {/* 안내 */}
+            <div className="bg-emerald-900/30 border border-emerald-700/50 rounded-xl p-4">
+              <p className="text-xs font-bold text-emerald-400 mb-1">📋 피평가자 전용 로그인</p>
+              <p className="text-xs text-emerald-600 leading-relaxed">
+                로그인 후 배정된 출제문제(3문제)를 확인하고 다운로드할 수 있습니다.
+              </p>
+              <div className="mt-2 pt-2 border-t border-emerald-800/50">
+                <p className="text-xs text-emerald-700">
+                  초기 비밀번호: 이름 영문 이니셜 + 2026
+                  <span className="ml-1.5 font-mono bg-slate-800 px-1 rounded text-emerald-500">예: kcg2026</span>
+                </p>
+              </div>
+            </div>
+
+            {/* 피평가자 선택 */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-300 mb-2">이름 선택</label>
+              <div className="grid grid-cols-3 gap-2">
+                {QS_CANDIDATES.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCandidateId(c.id)}
+                    className={`px-3 py-3 rounded-xl border-2 text-sm font-bold transition-all text-center ${
+                      candidateId === c.id
+                        ? 'ring-2 ring-emerald-400/50'
+                        : 'border-slate-600 bg-slate-700/60 text-slate-400 hover:border-slate-500'
+                    }`}
+                    style={candidateId === c.id ? {
+                      borderColor: '#065f46',
+                      background: 'rgba(6,95,70,0.3)',
+                      color: '#6ee7b7',
+                    } : {}}
+                  >
+                    <div className="text-lg mb-0.5">
+                      {c.name.charAt(0)}
+                    </div>
+                    <div className="text-xs">{c.name}</div>
+                    <div className="text-[10px] opacity-60 mt-0.5">{c.team}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 비밀번호 */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-300 mb-2">비밀번호</label>
+              <input
+                type="password"
+                value={candidatePassword}
+                onChange={(e) => setCandidatePassword(e.target.value)}
+                placeholder="비밀번호를 입력하세요"
+                className="w-full px-4 py-3 border-2 border-slate-600 rounded-lg bg-slate-700 text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-400/20 outline-none transition-all"
+              />
+            </div>
+
+            {/* 에러 */}
+            {candidateError && (
+              <div className="bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-sm text-red-400">
+                ⚠️ {candidateError}
+              </div>
+            )}
+
+            {/* 로그인 버튼 */}
+            <button
+              type="submit"
+              disabled={candidateLoading}
+              className="w-full py-4 rounded-lg font-bold text-base transition-all shadow-lg disabled:opacity-50 hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #065f46 0%, #047857 100%)', color: '#6ee7b7' }}
+            >
+              {candidateLoading ? '확인 중...' : '📋 내 출제문제 보기'}
+            </button>
+          </form>
+        )}
+
+        {/* 로그인 폼 (평가위원) */}
+        {loginMode === 'evaluator' && (
         <form onSubmit={handleLogin} className="px-8 py-6 space-y-5">
 
           {/* 문제은행 PDF 링크 */}
@@ -727,71 +875,78 @@ export default function QSLoginPage() {
           )}
         </form>
 
-        {/* 관리자 로그인 */}
-        <div className="px-8 py-4 border-t border-slate-700">
-          {!showAdminLogin ? (
-            <button
-              type="button"
-              onClick={() => setShowAdminLogin(true)}
-              className="text-sm text-slate-500 hover:text-amber-500 transition-colors flex items-center gap-1.5"
-            >
-              👑 관리자 로그인
-            </button>
-          ) : (
-            <div className="space-y-3 p-4 rounded-lg border border-amber-800/50 bg-amber-900/20">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-amber-400">👑 관리자 로그인</span>
-                <button
-                  type="button"
-                  onClick={() => { setShowAdminLogin(false); setAdminError(''); setAdminId(''); setAdminPassword(''); }}
-                  className="text-xs text-slate-500 hover:text-slate-400"
-                >
-                  닫기
-                </button>
+        )} {/* end loginMode === 'evaluator' */}
+
+        {/* 관리자 로그인 — 평가위원 탭에서만 표시 */}
+        {loginMode === 'evaluator' && (
+          <div className="px-8 py-4 border-t border-slate-700">
+            {!showAdminLogin ? (
+              <button
+                type="button"
+                onClick={() => setShowAdminLogin(true)}
+                className="text-sm text-slate-500 hover:text-amber-500 transition-colors flex items-center gap-1.5"
+              >
+                👑 관리자 로그인
+              </button>
+            ) : (
+              <div className="space-y-3 p-4 rounded-lg border border-amber-800/50 bg-amber-900/20">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-amber-400">👑 관리자 로그인</span>
+                  <button
+                    type="button"
+                    onClick={() => { setShowAdminLogin(false); setAdminError(''); setAdminId(''); setAdminPassword(''); }}
+                    className="text-xs text-slate-500 hover:text-slate-400"
+                  >
+                    닫기
+                  </button>
+                </div>
+                <form onSubmit={handleAdminLogin} className="space-y-2">
+                  <input
+                    type="text"
+                    value={adminId}
+                    onChange={(e) => setAdminId(e.target.value)}
+                    placeholder="관리자 아이디"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 placeholder-slate-500 text-sm outline-none focus:border-amber-600"
+                  />
+                  <input
+                    type="password"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="비밀번호"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 placeholder-slate-500 text-sm outline-none focus:border-amber-600"
+                  />
+                  {adminError && (
+                    <p className="text-xs text-red-400">⚠️ {adminError}</p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={adminLoading}
+                    className="w-full py-2 rounded-lg text-sm font-bold text-stone-900 disabled:opacity-50"
+                    style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
+                  >
+                    {adminLoading ? '확인 중...' : '관리자로 로그인'}
+                  </button>
+                </form>
               </div>
-              <form onSubmit={handleAdminLogin} className="space-y-2">
-                <input
-                  type="text"
-                  value={adminId}
-                  onChange={(e) => setAdminId(e.target.value)}
-                  placeholder="관리자 아이디"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 placeholder-slate-500 text-sm outline-none focus:border-amber-600"
-                />
-                <input
-                  type="password"
-                  value={adminPassword}
-                  onChange={(e) => setAdminPassword(e.target.value)}
-                  placeholder="비밀번호"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 placeholder-slate-500 text-sm outline-none focus:border-amber-600"
-                />
-                {adminError && (
-                  <p className="text-xs text-red-400">⚠️ {adminError}</p>
-                )}
-                <button
-                  type="submit"
-                  disabled={adminLoading}
-                  className="w-full py-2 rounded-lg text-sm font-bold text-stone-900 disabled:opacity-50"
-                  style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}
-                >
-                  {adminLoading ? '확인 중...' : '관리자로 로그인'}
-                </button>
-              </form>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* 하단 링크 */}
-        <div className="px-8 py-4 bg-slate-700/40 border-t border-slate-700 flex items-center justify-between">
-          <button onClick={() => navigate('/question-selection/results')}
-            className="text-sm text-slate-400 hover:text-blue-400 transition-colors underline">
-            📊 투표 현황 및 결과 보기
-          </button>
-          <button onClick={openPwChange}
-            className="text-xs transition"
-            style={{ color: 'rgb(214,173,101)' }}>
-            🔑 비밀번호 변경
-          </button>
-        </div>
+        {loginMode === 'evaluator' && (
+          <div className="px-8 py-4 bg-slate-700/40 border-t border-slate-700 flex items-center justify-between">
+            <button onClick={() => navigate('/question-selection/results')}
+              className="text-sm text-slate-400 hover:text-blue-400 transition-colors underline">
+              📊 투표 현황 및 결과 보기
+            </button>
+            <button onClick={openPwChange}
+              className="text-xs transition"
+              style={{ color: 'rgb(214,173,101)' }}>
+              🔑 비밀번호 변경
+            </button>
+          </div>
+        )}
+
       </div>
     </div>
     </>

@@ -127,7 +127,7 @@ export const useStore = create((set, get) => ({
   loadPeriods: async () => {
     const { data, error } = await supabase
       .from('chief_eval_periods')
-      .select('id,name,year,term,status,eval_date,pass_score,total_max_score')
+      .select('id,name,year,term,status,eval_date,pass_score,total_max_score,finalized_at,finalized_by')
       .order('year', { ascending: false })
       .order('term', { ascending: false });
     if (error) throw error;
@@ -140,6 +140,8 @@ export const useStore = create((set, get) => ({
       evalDate: p.eval_date,
       passScore: Number(p.pass_score) || 70,
       totalMaxScore: Number(p.total_max_score) || 110,
+      finalized_at: p.finalized_at || null,
+      finalized_by: p.finalized_by || null,
     }));
     const active = periods.find(p => p.status === 'active') || periods[0];
     set({ periods, selectedPeriodId: active?.id || null });
@@ -166,7 +168,7 @@ export const useStore = create((set, get) => ({
       { data: allScores, error: scoreErr },
       { data: bonusData, error: bonusErr },
     ] = await Promise.all([
-      supabase.from('chief_eval_periods').select('id,name,pass_score,total_max_score,status').eq('id', pid).single(),
+      supabase.from('chief_eval_periods').select('id,name,pass_score,total_max_score,status,finalized_at,finalized_by').eq('id', pid).single(),
       supabase.from('chief_evaluators').select('*').eq('is_active', true),
       supabase.from('chief_period_evaluators').select('evaluator_id').eq('period_id', pid),
       supabase.from('chief_candidates').select('*').eq('period_id', pid),
@@ -215,6 +217,8 @@ export const useStore = create((set, get) => ({
         passScore: Number(periodData.pass_score) || PASS_SCORE,
         totalMaxScore: Number(periodData.total_max_score) || 110,
         status: periodData.status,
+        finalized_at: periodData.finalized_at || null,
+        finalized_by: periodData.finalized_by || null,
       } : null,
       allEvaluators,
       evaluators,
@@ -921,5 +925,40 @@ export const useStore = create((set, get) => ({
         .update({ status: 'draft' }).eq('status', 'active').neq('id', periodId);
     }
     await get().loadPeriods();
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // 최종평가결과 마감 / 마감 해제
+  // ═══════════════════════════════════════════════════════════════
+  finalizePeriod: async (periodId, adminId) => {
+    const { error } = await supabase.from('chief_eval_periods')
+      .update({
+        finalized_at: new Date().toISOString(),
+        finalized_by: adminId,
+      })
+      .eq('id', periodId);
+    if (error) throw error;
+    await get().loadPeriods();
+    // periodInfo 갱신
+    const period = get().periods.find(p => p.id === periodId);
+    if (period) {
+      set(state => ({
+        periodInfo: { ...state.periodInfo, finalized_at: period.finalized_at, finalized_by: period.finalized_by },
+      }));
+    }
+  },
+
+  unfinalizePeriod: async (periodId) => {
+    const { error } = await supabase.from('chief_eval_periods')
+      .update({
+        finalized_at: null,
+        finalized_by: null,
+      })
+      .eq('id', periodId);
+    if (error) throw error;
+    await get().loadPeriods();
+    set(state => ({
+      periodInfo: { ...state.periodInfo, finalized_at: null, finalized_by: null },
+    }));
   },
 }));

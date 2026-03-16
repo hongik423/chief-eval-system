@@ -13,7 +13,7 @@ const ACTIVE_PERIOD_ID = 'a0000000-0000-0000-0000-000000000001';
 // ─── 2차 출제 피평가자 목록 ───────────────────────────────────────
 export const ROUND2_CANDIDATES = [
   { id: 'kcg', name: '김창곤', team: '컨설팅6본부' },
-  { id: 'bjy', name: '백진영', team: '미정' },
+  { id: 'bjy', name: '백진영', team: '권영도 코치' },
   { id: 'yhh', name: '양현호', team: '무소속' },
 ];
 
