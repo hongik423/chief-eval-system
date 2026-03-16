@@ -429,7 +429,7 @@ INSERT INTO chief_evaluators (id, name, role, team, email, password_hash) VALUES
 INSERT INTO chief_candidates (id, name, team, phone, email, period_id, status) VALUES
   ('kcg', '김창곤', '컨설팅6본부',     '010-9845-9183', 'kcg@stellain.com', 'a0000000-0000-0000-0000-000000000001', 'registered'),
   ('bjy', '백진영', '미정',           null,             null,                'a0000000-0000-0000-0000-000000000001', 'registered'),
-  ('yhh', '양현호', 'C팀', '010-3794-0404', 'yhh@stellain.com', 'a0000000-0000-0000-0000-000000000001', 'registered');
+  ('yhh', '양현호', '무소속', '010-3794-0404', 'yhh@stellain.com', 'a0000000-0000-0000-0000-000000000001', 'registered');
 
 -- 4) 평가 기준 섹션
 INSERT INTO chief_eval_criteria_sections (id, period_id, label, max_score, eval_method, sort_order) VALUES

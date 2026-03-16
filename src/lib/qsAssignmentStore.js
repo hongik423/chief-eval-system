@@ -14,7 +14,7 @@ const ACTIVE_PERIOD_ID = 'a0000000-0000-0000-0000-000000000001';
 export const ROUND2_CANDIDATES = [
   { id: 'kcg', name: '김창곤', team: '컨설팅6본부' },
   { id: 'bjy', name: '백진영', team: '미정' },
-  { id: 'yhh', name: '양현호', team: 'C팀' },
+  { id: 'yhh', name: '양현호', team: '무소속' },
 ];
 
 // ─── 2차 출제 문제 풀 (1차 최종 선정 9문제) ──────────────────────

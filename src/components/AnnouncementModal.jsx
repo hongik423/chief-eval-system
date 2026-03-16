@@ -63,9 +63,9 @@ export default function AnnouncementModal({ open, onClose }) {
                   <td className={tdClass}>100점</td>
                   <td className={tdClass}>PT+인터뷰</td>
                   <td className={tdClass}>
-                    A. 세무사 협력 커뮤니케이션 역량 (50점)<br />
-                    B. 고객 솔루션 제안 커뮤니케이션 역량 (30점)<br />
-                    C. 프로젝트 설계 및 실무 역량 (20점)
+                    A. 커뮤니케이션(인터뷰) 역량 (50점)<br />
+                    B. 결과보기 제안능력 (40점)<br />
+                    C. 실행설계와 위험고지 (10점)
                   </td>
                 </tr>
                 <tr>
@@ -106,33 +106,32 @@ export default function AnnouncementModal({ open, onClose }) {
               </thead>
               <tbody>
                 <tr>
-                  <td className={tdClass}>A. 세무사 협력 커뮤니케이션 역량</td>
+                  <td className={tdClass}>A. 커뮤니케이션(인터뷰) 역량</td>
                   <td className={tdClass}>50점</td>
                   <td className={tdClass}>인터뷰 (1:1 롤플레이)</td>
                   <td className={tdClass}>
-                    • 세무사 응대 및 관계 구축 능력 (20점)<br />
-                    • 프로젝트 협의 커뮤니케이션 스킬 (20점)<br />
-                    • 치프-세무사-고객 간 인터페이스 조율 역량 (10점)
+                    • 고객과의 관계 정립 + 브랜드 소개 (20점)<br />
+                    • 이슈 인터뷰 (Hidden Interest 찾기) (20점)<br />
+                    • 거절처리와 차별화 포인트 (10점)
                   </td>
                 </tr>
                 <tr>
-                  <td className={tdClass}>B. 고객 솔루션 제안 커뮤니케이션 역량</td>
-                  <td className={tdClass}>30점</td>
-                  <td className={tdClass}>PT (프레젠테이션)</td>
+                  <td className={tdClass}>B. 결과보기 제안능력</td>
+                  <td className={tdClass}>40점</td>
+                  <td className={tdClass}>PT (프레젠테이션 / 결과보기 롤플레이)</td>
                   <td className={tdClass}>
-                    • 고객 문제 진단 및 설명 능력 (10점)<br />
-                    • 솔루션 제안 전달력 및 설득력 (10점)<br />
-                    • 금융/법률 연계 방안 제시 능력 (10점)
+                    • 문제정의 및 설명 능력 (10점)<br />
+                    • 솔루션(스토리) 전달 및 설득력 (10점)<br />
+                    • 스마트빌 명분과 솔루션 연계 (20점)
                   </td>
                 </tr>
                 <tr>
-                  <td className={tdClass}>C. 프로젝트 설계 및 실무 역량</td>
-                  <td className={tdClass}>20점</td>
-                  <td className={tdClass}>PT (프레젠테이션)</td>
+                  <td className={tdClass}>C. 실행설계와 위험고지</td>
+                  <td className={tdClass}>10점</td>
+                  <td className={tdClass}>PT (실무 설계 기반)</td>
                   <td className={tdClass}>
-                    • 프로젝트 목표 및 범위 정의 (10점)<br />
-                    • 단계별 실행 계획 수립 (5점)<br />
-                    • 리스크 관리 및 대응 전략 (5점)
+                    • 업무요약서 작성 및 설명 (5점)<br />
+                    • 리스크 관리(위험고지) 및 대응 고지 (5점)
                   </td>
                 </tr>
                 <tr>

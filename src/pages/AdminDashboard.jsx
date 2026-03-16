@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { PASS_SCORE, TOTAL_MAX_SCORE } from '@/lib/constants';
 import {
@@ -205,8 +205,9 @@ export default function AdminDashboard() {
           <Card className="bg-surface-300/50">
             <div className="text-sm font-bold text-white mb-2">📐 점수 산정 공식</div>
             <div className="text-xs text-slate-400 leading-relaxed space-y-1">
-              <div>평균 점수 = (Σ 평가위원 PM역량점수 + 가점) ÷ 평가위원 수</div>
-              <div>※ 소속 평가위원 점수는 총점 및 평가인원에서 제외</div>
+              <div>평균 점수 = (Σ 평가위원 PM역량점수 + 가점) ÷ N  <span className="text-slate-500">(N = 유효 평가위원 수)</span></div>
+              <div className="text-amber-400/80 font-semibold">※ 가점은 획득점수 / N (N = 평가위원의 수) 으로 적용</div>
+              <div>※ 소속 평가위원 점수는 총점 및 평가인원(N)에서 제외</div>
               <div>※ 합격 기준: 평균 {periodInfo?.passScore ?? PASS_SCORE}점 이상 ({periodInfo?.totalMaxScore ?? TOTAL_MAX_SCORE}점 만점 기준)</div>
             </div>
           </Card>

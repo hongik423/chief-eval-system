@@ -249,6 +249,7 @@ export const useStore = create((set, get) => ({
     const ev = evaluators.find(e => e.id === evaluatorId);
     const ca = candidates.find(c => c.id === candidateId);
     if (!ev || !ca) return false;
+    if (ca.team === '무소속') return false;  // 무소속 피평가자는 모든 평가위원이 평가
     return ev.team === ca.team && ev.team !== '대표';
   },
 

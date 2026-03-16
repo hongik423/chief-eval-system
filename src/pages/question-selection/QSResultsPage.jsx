@@ -2666,9 +2666,9 @@ export default function QSResultsPage() {
                       <p className="text-[11px] font-bold text-purple-300 mb-2">📋 평가 기준표 (PM 역량평가 100점 + 가점 10점)</p>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         {(evalCriteriaSections.length > 0 ? evalCriteriaSections : [
-                          { id: 'A', label: '세무사 협력 커뮤니케이션 역량', maxScore: 50, evalMethod: '인터뷰' },
-                          { id: 'B', label: '고객 솔루션 제안 커뮤니케이션 역량', maxScore: 30, evalMethod: 'PT' },
-                          { id: 'C', label: '프로젝트 설계 및 실무 역량', maxScore: 20, evalMethod: 'PT' },
+                          { id: 'A', label: '커뮤니케이션(인터뷰) 역량', maxScore: 50, evalMethod: '인터뷰' },
+                          { id: 'B', label: '결과보기 제안능력', maxScore: 40, evalMethod: 'PT' },
+                          { id: 'C', label: '실행설계와 위험고지', maxScore: 10, evalMethod: 'PT' },
                         ]).map((sec) => (
                           <div key={sec.id || sec.displayCode} className="rounded-lg px-3 py-2 border border-slate-700/30 bg-slate-800/40">
                             <div className="flex items-center gap-1.5 mb-1">
@@ -2803,9 +2803,9 @@ export default function QSResultsPage() {
 
                       // ── 평가 데이터가 있는 경우: 상세 점수 표시 ──
                       const sections = evalCriteriaSections.length > 0 ? evalCriteriaSections : [
-                        { id: 'A', displayCode: 'A', label: '세무사 협력 커뮤니케이션 역량', maxScore: 50 },
-                        { id: 'B', displayCode: 'B', label: '고객 솔루션 제안 커뮤니케이션 역량', maxScore: 30 },
-                        { id: 'C', displayCode: 'C', label: '프로젝트 설계 및 실무 역량', maxScore: 20 },
+                        { id: 'A', displayCode: 'A', label: '커뮤니케이션(인터뷰) 역량', maxScore: 50 },
+                        { id: 'B', displayCode: 'B', label: '결과보기 제안능력', maxScore: 40 },
+                        { id: 'C', displayCode: 'C', label: '실행설계와 위험고지', maxScore: 10 },
                       ];
                       const passScore = evalPeriodInfo?.passScore ?? 70;
 

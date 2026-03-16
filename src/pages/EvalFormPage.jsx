@@ -53,7 +53,7 @@ function BarsGuidePanel({ itemId, maxScore }) {
       {guide.refQuestions?.length > 0 && (
         <div className="border-t border-amber-500/20 bg-amber-500/5">
           <div className="px-4 py-2 border-b border-amber-500/15">
-            <span className="text-[11px] font-bold text-amber-400">📋 평가자 참조 — 체크 질문</span>
+            <span className="text-[11px] font-bold text-amber-400">📋 평가위원 참조 — 체크 질문</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3">
             {guide.refQuestions.map((rq, i) => (
@@ -300,6 +300,19 @@ export default function EvalFormPage({ candidateId, onBack }) {
                   <h3 className="text-[15px] font-bold text-white">{section.label}</h3>
                 </div>
                 <div className="text-[11px] text-slate-500 ml-9">{section.evalMethod}</div>
+
+                {/* ── A 영역 전용: 별첨자료 활용 점검 안내 ── */}
+                {section.id === 'A' && (
+                  <div className="ml-9 mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/25">
+                    <span className="text-orange-400 text-[11px]">📎</span>
+                    <span className="text-[11px] font-semibold text-orange-300">
+                      별첨자료 활용 점검 (인터뷰 시):
+                    </span>
+                    <span className="text-[11px] text-orange-200">
+                      산출물 — <strong>RFN</strong> (고객요구사항), <strong>NDA</strong> (비밀유지계약서)
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="text-right">
                 <div className="text-xl font-extrabold text-white font-mono">

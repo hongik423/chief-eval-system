@@ -17,26 +17,104 @@ export const DEFAULT_EVALUATORS = [
 export const DEFAULT_CANDIDATES = [
   { id: 'kcg', name: '김창곤', team: '컨설팅6본부',     phone: '010-9845-9183', email: 'kcg@stellain.com', status: 'registered' },
   { id: 'bjy', name: '백진영', team: '미정',           phone: null, email: null, status: 'registered' },
-  { id: 'yhh', name: '양현호', team: 'C팀', phone: '010-3794-0404', email: 'yhh@stellain.com', status: 'registered' },
+  { id: 'yhh', name: '양현호', team: '무소속', phone: '010-3794-0404', email: 'yhh@stellain.com', status: 'registered' },
 ];
 
-// ─── 기본 평가 기준 (수정 가능 구조) ───
+// ─── 최종확정 평가 기준 (2026년 치프인증 — 2026-03-16 확정) ───
 export const DEFAULT_CRITERIA = {
   sections: [
-    { id: 'A', label: '세무사 협력 커뮤니케이션 역량', maxScore: 50, evalMethod: '인터뷰 (1:1 롤플레이)', sortOrder: 1 },
-    { id: 'B', label: '고객 솔루션 제안 커뮤니케이션 역량', maxScore: 30, evalMethod: 'PT (프레젠테이션)', sortOrder: 2 },
-    { id: 'C', label: '프로젝트 설계 및 실무 역량', maxScore: 20, evalMethod: 'PT (프레젠테이션)', sortOrder: 3 },
+    {
+      id: 'A',
+      label: '커뮤니케이션(인터뷰) 역량',
+      maxScore: 50,
+      evalMethod: '인터뷰 (1:1 롤플레이) · 별첨자료 활용 점검: RFN, NDA',
+      sortOrder: 1,
+    },
+    {
+      id: 'B',
+      label: '결과보기 제안능력',
+      maxScore: 40,
+      evalMethod: 'PT (프레젠테이션 / 결과보기 롤플레이)',
+      sortOrder: 2,
+    },
+    {
+      id: 'C',
+      label: '실행설계와 위험고지',
+      maxScore: 10,
+      evalMethod: 'PT (실무 설계 기반)',
+      sortOrder: 3,
+    },
   ],
   items: [
-    { id: 'A1', sectionId: 'A', label: '세무사 응대 및 관계 구축 능력', maxScore: 20, description: '세무사와의 초기 접점 형성, 신뢰 구축, 전문성 인지 등', sortOrder: 1 },
-    { id: 'A2', sectionId: 'A', label: '프로젝트 협의 커뮤니케이션 스킬', maxScore: 20, description: '프로젝트 범위·일정·역할 협의 시 커뮤니케이션 역량', sortOrder: 2 },
-    { id: 'A3', sectionId: 'A', label: '치프-세무사-고객 간 인터페이스 조율 역량', maxScore: 10, description: '삼자 간 이해관계 조율 및 정보 중개 역량', sortOrder: 3 },
-    { id: 'B1', sectionId: 'B', label: '고객 문제 진단 및 설명 능력', maxScore: 10, description: '고객의 핵심 이슈를 구조화하여 설명하는 능력', sortOrder: 1 },
-    { id: 'B2', sectionId: 'B', label: '솔루션 제안 전달력 및 설득력', maxScore: 10, description: '솔루션을 명확하고 설득력 있게 전달하는 역량', sortOrder: 2 },
-    { id: 'B3', sectionId: 'B', label: '금융/법률 연계 방안 제시 능력', maxScore: 10, description: '세무 외 금융·법률 등 연계 솔루션 제안 역량', sortOrder: 3 },
-    { id: 'C1', sectionId: 'C', label: '프로젝트 목표 및 범위 정의', maxScore: 10, description: '프로젝트의 목표·범위·산출물을 명확히 정의', sortOrder: 1 },
-    { id: 'C2', sectionId: 'C', label: '단계별 실행 계획 수립', maxScore: 5, description: '타임라인, 마일스톤, 담당자 배정 등 실행 계획', sortOrder: 2 },
-    { id: 'C3', sectionId: 'C', label: '리스크 관리 및 대응 전략', maxScore: 5, description: '잠재 리스크 식별 및 대응 방안 수립', sortOrder: 3 },
+    // ── A 영역 (50점) ──────────────────────────────────────────
+    {
+      id: 'A1',
+      sectionId: 'A',
+      label: '고객과의 관계 정립 + 브랜드 소개',
+      maxScore: 20,
+      description: '고객과의 첫 만남에서 신뢰를 형성하고, 기업의별 브랜드와 치프의 역할·차별점을 명확히 소개하는 역량',
+      sortOrder: 1,
+    },
+    {
+      id: 'A2',
+      sectionId: 'A',
+      label: '이슈 인터뷰 (Hidden Interest 찾기)',
+      maxScore: 20,
+      description: '구조화된 인터뷰를 통해 고객의 표면적 발언 이면에 있는 숨겨진 관심사(Hidden Interest)를 발굴하는 역량',
+      sortOrder: 2,
+    },
+    {
+      id: 'A3',
+      sectionId: 'A',
+      label: '거절처리와 차별화 포인트',
+      maxScore: 10,
+      description: '고객의 가격·기간·필요성 거절에 능숙하게 대응하고, 기업의별 치프 서비스의 차별화 포인트를 설득력 있게 제시하는 역량',
+      sortOrder: 3,
+    },
+
+    // ── B 영역 (40점) ──────────────────────────────────────────
+    {
+      id: 'B1',
+      sectionId: 'B',
+      label: '문제정의 및 설명 능력',
+      maxScore: 10,
+      description: '고객의 핵심 이슈를 구조화하여 명확히 정의하고, 문제의 위험성과 긴박성을 수치 기반으로 설명하는 역량',
+      sortOrder: 1,
+    },
+    {
+      id: 'B2',
+      sectionId: 'B',
+      label: '솔루션(스토리) 전달 및 설득력',
+      maxScore: 10,
+      description: '고객이 이해하고 공감할 수 있는 솔루션 스토리를 구성하고, 반론에 설득력 있게 응대하는 역량',
+      sortOrder: 2,
+    },
+    {
+      id: 'B3',
+      sectionId: 'B',
+      label: '스마트빌 명분과 솔루션 연계',
+      maxScore: 20,
+      description: '스마트빌의 명분(통합 전문가 팀, 계약 기반 책임 컨설팅, 사후관리 체계)을 고객 문제 상황과 정확히 연계하여 설득하는 역량',
+      sortOrder: 3,
+    },
+
+    // ── C 영역 (10점) ──────────────────────────────────────────
+    {
+      id: 'C1',
+      sectionId: 'C',
+      label: '업무요약서 작성 및 설명',
+      maxScore: 5,
+      description: '인터뷰 내용을 바탕으로 고객 상황·이슈·제안 방향이 정리된 업무요약서를 작성하고, 고객이 이해하기 쉽게 설명하는 역량',
+      sortOrder: 1,
+    },
+    {
+      id: 'C2',
+      sectionId: 'C',
+      label: '리스크 관리(위험고지) 및 대응 고지',
+      maxScore: 5,
+      description: '프로젝트 진행 시 발생 가능한 리스크를 고객에게 명확히 고지하고, 각 리스크에 대한 대응 방안과 책임 범위를 투명하게 설명하는 역량',
+      sortOrder: 2,
+    },
   ],
 };
 
