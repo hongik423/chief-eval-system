@@ -7,3 +7,6 @@ dist/
 desktop.ini
 .git-commit-msg2.txt
 *.log
+supabase/.temp/
+~$*.docx
+*.docx
