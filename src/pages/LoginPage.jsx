@@ -95,10 +95,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-surface-0 via-[#0D1520] to-[#0F1A2C] py-6 px-4 sm:px-6">
+    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-surface-0 via-[#0D1520] to-[#0F1A2C] py-4 sm:py-6 px-3 sm:px-6">
       {introBannerOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-[620px] rounded-2xl border border-amber-700/40 overflow-hidden shadow-2xl bg-surface-100">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-[620px] max-h-[90dvh] overflow-y-auto rounded-2xl border border-amber-700/40 shadow-2xl bg-surface-100 my-auto">
             <div
               className="px-6 py-6 text-center"
               style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}

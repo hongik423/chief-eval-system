@@ -23,6 +23,24 @@ body {
   -moz-osx-font-smoothing: grayscale;
   /* 터치 스크롤 부드럽게 */
   -webkit-overflow-scrolling: touch;
+  /* 터치 반응 개선 - 300ms 딜레이 제거 */
+  touch-action: manipulation;
+}
+
+/* 모바일 터치 영역 - 탭 하이라이트 최소화 */
+button, a, [role="button"], input, select, textarea {
+  -webkit-tap-highlight-color: rgba(74, 124, 255, 0.15);
+  tap-highlight-color: rgba(74, 124, 255, 0.15);
+}
+
+/* iOS 줌 방지 - input 포커스 시 16px 미만이면 줌 발생 */
+input, select, textarea {
+  font-size: 16px;
+}
+@media (min-width: 640px) {
+  input, select, textarea {
+    font-size: inherit;
+  }
 }
 
 input[type="number"]::-webkit-inner-spin-button,
@@ -56,4 +74,13 @@ input[type="number"] {
 /* Toast overrides */
 .toast-custom {
   font-family: 'Pretendard', sans-serif !important;
+}
+
+/* 모바일 가로 스크롤 시 스크롤바 숨김 (네비 등) */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

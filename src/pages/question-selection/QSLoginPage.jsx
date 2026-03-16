@@ -583,11 +583,11 @@ export default function QSLoginPage() {
     {/* ════════════════════════════════════════
         로그인 페이지
     ════════════════════════════════════════ */}
-    <div className="max-w-lg mx-auto mt-4">
+    <div className="max-w-lg mx-auto mt-2 sm:mt-4 px-3 sm:px-4 pb-6">
       <div className="bg-slate-800 rounded-2xl shadow-lg border border-slate-700 overflow-hidden">
 
         {/* 상단 배너 – 인증 평가 진행 안내 */}
-        <div className="px-8 py-8 text-center"
+        <div className="px-4 sm:px-8 py-6 sm:py-8 text-center"
           style={{ background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)' }}>
           <div className="text-5xl mb-3">🏆</div>
           <h2 className="text-2xl font-bold mb-2 text-stone-900">2026 ASSO 치프인증 평가</h2>
@@ -596,7 +596,7 @@ export default function QSLoginPage() {
         </div>
 
         {/* D-Day 카운터 배너 */}
-        <div className="px-6 py-4 flex items-center gap-3 border-b border-amber-900/40"
+        <div className="px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 border-b border-amber-900/40"
           style={{ background: 'linear-gradient(135deg, #422006 0%, #78350f 100%)' }}>
           <span className="text-2xl">📅</span>
           <div className="flex-1 min-w-0">
@@ -713,7 +713,7 @@ export default function QSLoginPage() {
             {/* 피평가자 선택 */}
             <div>
               <label className="block text-sm font-semibold text-slate-300 mb-2">이름 선택</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 xs:grid-cols-3 gap-2">
                 {QS_CANDIDATES.map((c) => (
                   <button
                     key={c.id}

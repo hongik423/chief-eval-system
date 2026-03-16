@@ -3787,10 +3787,10 @@ function CandidateAssignmentView({ candidate, onLogout }) {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-8">
       {/* 헤더 */}
       <div
-        className="rounded-2xl overflow-hidden mb-6 shadow-2xl border-2"
+        className="rounded-2xl overflow-hidden mb-4 sm:mb-6 shadow-2xl border-2"
         style={{ borderColor: 'rgb(214,173,101)', background: 'linear-gradient(135deg, #1a1207 0%, #292010 100%)' }}
       >
         <div
