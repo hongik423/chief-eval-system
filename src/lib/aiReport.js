@@ -14,17 +14,18 @@ const CLAUDE_MODEL = import.meta.env.VITE_CLAUDE_MODEL || 'claude-sonnet-4-6';
 const GEMINI_IMAGE_MODEL = import.meta.env.VITE_GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image-preview';
 
 // ─── 보고서 섹션 정의 (순서 고정) ───
+// imagePromptHint: null이면 이미지 미생성. 총 4개 섹션만 이미지 (표지 포함 5장 이하)
 const REPORT_SECTIONS = [
-  { key: 'overview',       title: '종합 평가 개요',              imagePromptHint: 'overall assessment summary radar chart' },
-  { key: 'scoreTable',     title: '평가 점수 총괄표',            imagePromptHint: null }, // 표로 대체
-  { key: 'sectionA',       title: 'A. 커뮤니케이션(인터뷰) 역량 심층 분석', imagePromptHint: 'communication interview competency analysis' },
-  { key: 'sectionB',       title: 'B. 결과보기 제안능력 심층 분석',          imagePromptHint: 'presentation proposal competency analysis' },
-  { key: 'sectionC',       title: 'C. 실행설계와 위험고지 심층 분석',        imagePromptHint: 'execution planning risk management analysis' },
-  { key: 'strengths',      title: '핵심 강점 분석',              imagePromptHint: 'key strengths star chart' },
-  { key: 'improvements',   title: '보완 과제 및 개선 방향',       imagePromptHint: 'improvement areas action plan' },
+  { key: 'overview',       title: '종합 평가 개요',              imagePromptHint: 'abstract business evaluation overview with geometric shapes and connected nodes' },
+  { key: 'scoreTable',     title: '평가 점수 총괄표',            imagePromptHint: null },
+  { key: 'sectionA',       title: 'A. 커뮤니케이션(인터뷰) 역량 심층 분석', imagePromptHint: 'abstract handshake and conversation bubbles in corporate style' },
+  { key: 'sectionB',       title: 'B. 결과보기 제안능력 심층 분석',          imagePromptHint: null },
+  { key: 'sectionC',       title: 'C. 실행설계와 위험고지 심층 분석',        imagePromptHint: null },
+  { key: 'strengths',      title: '핵심 강점 분석',              imagePromptHint: 'abstract golden star with upward arrows representing excellence' },
+  { key: 'improvements',   title: '보완 과제 및 개선 방향',       imagePromptHint: null },
   { key: 'contrasting',    title: '대비되는 평가 의견',           imagePromptHint: null },
-  { key: 'roadmap',        title: '성장 로드맵 — 12주 학습 액션 플랜', imagePromptHint: 'growth roadmap 12 week learning plan timeline' },
-  { key: 'conclusion',     title: '결론 및 권고사항',             imagePromptHint: 'conclusion recommendations badge' },
+  { key: 'roadmap',        title: '성장 로드맵 — 12주 학습 액션 플랜', imagePromptHint: 'abstract ascending staircase path with milestone dots in teal and navy' },
+  { key: 'conclusion',     title: '결론 및 권고사항',             imagePromptHint: null },
 ];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -32,11 +33,11 @@ const REPORT_SECTIONS = [
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export async function generateCoverImage(candidateName, apiKey) {
   if (!apiKey) return null;
-  const prompt = `Create a professional, elegant certificate cover image for "기업의별 치프인증 평가 보고서" (Stellain Chief Certification Evaluation Report).
-The image must prominently display the recipient name "${candidateName}" (치프인증자) in Korean text.
-Style: clean, corporate, trustworthy, blue/teal color scheme. Minimal design with geometric patterns.
-Include a subtle star emblem and certification seal motif.
-Do not include any placeholder text. Use the exact name: ${candidateName}.`;
+  const prompt = `Create a professional, elegant certificate cover image.
+Style: clean, corporate, trustworthy. Color palette: deep navy (#1a1f36), teal (#0d9488), gold accent (#d4af37), white.
+Design: abstract geometric patterns, subtle star emblem and certification seal motif at center.
+Include thin decorative border lines and soft gradient background.
+CRITICAL: Do NOT include ANY text, letters, words, numbers, or characters of any language in the image. The image must be purely visual — no text whatsoever. Only abstract shapes, patterns, and symbols.`;
   return await callGeminiImage(prompt, apiKey);
 }
 
@@ -45,19 +46,17 @@ Do not include any placeholder text. Use the exact name: ${candidateName}.`;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export async function generateSectionImage(sectionTitle, candidateName, sectionSummary, apiKey) {
   if (!apiKey) return null;
-  const prompt = `Create a professional infographic-style insight card image for a business competency evaluation report.
-Section: "${sectionTitle}"
-Candidate: "${candidateName}"
-Key insight: "${sectionSummary}"
+  // imagePromptHint에서 이미 추상적 시각 요소로 기술됨
+  const prompt = `Create a professional abstract illustration for a business report.
+Visual concept: ${sectionSummary}
 
 Design requirements:
-- Clean, modern corporate style with dark navy/teal background
-- Section title prominently displayed in Korean
-- Visual representation of the key insight (icons, simple charts, or symbolic graphics)
-- Color palette: navy (#1a1f36), teal (#0d9488), amber (#f59e0b), white
-- Size: 800x400 pixels, landscape orientation
-- Professional and elegant, suitable for a Word document
-- Do NOT include long paragraphs of text — focus on visual storytelling`;
+- Clean, modern corporate style
+- Color palette: deep navy (#1a1f36), teal (#0d9488), amber (#f59e0b), white
+- Landscape orientation (wide format)
+- Abstract and symbolic — use geometric shapes, icons, gradients, and visual metaphors
+- Professional and elegant, suitable for a formal Word document
+- CRITICAL: Do NOT include ANY text, letters, words, numbers, or characters of any language. The image must be PURELY VISUAL — only abstract shapes, icons, and patterns. Zero text.`;
   return await callGeminiImage(prompt, apiKey);
 }
 
