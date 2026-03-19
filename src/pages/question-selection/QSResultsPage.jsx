@@ -164,6 +164,13 @@ export default function QSResultsPage() {
   const [rouletteAngle, setRouletteAngle] = useState(0);
   const [confirmingCandidate, setConfirmingCandidate] = useState(null); // 확정 저장 중인 candidateId
 
+  // ── 인터뷰 순서 룰렛 모달 (1-2-3 순서 결정)
+  const [showInterviewRoulette, setShowInterviewRoulette] = useState(false);
+  const [interviewRoulettePhase, setInterviewRoulettePhase] = useState('idle'); // idle | spinning | result
+  const [interviewRouletteAngle, setInterviewRouletteAngle] = useState(0);
+  const [interviewRouletteResultIndex, setInterviewRouletteResultIndex] = useState(null); // 0~5
+  const [interviewOrder, setInterviewOrder] = useState(null); // { firstId, secondId, thirdId }
+
   // ── Supabase 데이터 조회 패널
   const [supabaseProgress, setSupabaseProgress] = useState([]);
   const [showSupabasePanel, setShowSupabasePanel] = useState(false);
@@ -552,6 +559,28 @@ export default function QSResultsPage() {
     { key: 'temporary_payment', label: '가지급금', icon: '💰', color: '#6ee7b7', fill: '#1a4035', stroke: '#10b981' },
   ];
 
+  // ── 인터뷰 순서 룰렛 (김창곤/백진영/양현호 1-2-3 순서 결정)
+  const INTERVIEW_CANDIDATES = [
+    { id: 'kcg', name: '김창곤' },
+    { id: 'bjy', name: '백진영' },
+    { id: 'yhh', name: '양현호' },
+  ];
+
+  // 6가지 순열: [1순위, 2순위, 3순위]
+  const INTERVIEW_PERMUTATIONS = [
+    ['kcg', 'bjy', 'yhh'],
+    ['kcg', 'yhh', 'bjy'],
+    ['bjy', 'kcg', 'yhh'],
+    ['bjy', 'yhh', 'kcg'],
+    ['yhh', 'kcg', 'bjy'],
+    ['yhh', 'bjy', 'kcg'],
+  ];
+
+  const getInterviewName = (id) =>
+    INTERVIEW_CANDIDATES.find((c) => c.id === id)?.name || id;
+  const getInterviewShort = (id) =>
+    getInterviewName(id).charAt(0);
+
   // 3월 28일 오전 9시 이후에만 「추첨 결과 보기」 버튼 노출 (결과는 룰렛에서만 표시)
   const isAfterRevealTime = () => new Date() >= EXAM_DATE;
 
@@ -607,6 +636,36 @@ export default function QSResultsPage() {
   // ── 추적 데이터 리프레시
   const refreshTracker = () => {
     setTrackerSummary(getCandidateTrackerSummary());
+  };
+
+  // ── 인터뷰 순서 룰렛 스핀 (1회 잠금)
+  const handleSpinInterviewOrder = () => {
+    if (!adminMode) return;
+    if (showRoulette) return; // 최종 문제 추첨 모달과 동시 오픈 방지
+    if (showInterviewRoulette) return; // 인터뷰 룰렛 모달 중복 오픈 방지
+    if (interviewRoulettePhase === 'spinning') return;
+
+    const resultIndex = Math.floor(Math.random() * INTERVIEW_PERMUTATIONS.length);
+    const sectorCenter = resultIndex * 60 + 30;
+    const finalAngle = 6 * 360 + (360 - sectorCenter);
+
+    setInterviewRouletteResultIndex(resultIndex);
+    setInterviewOrder(null);
+
+    setInterviewRoulettePhase('idle');
+    setInterviewRouletteAngle(0);
+    setShowInterviewRoulette(true);
+
+    setTimeout(() => {
+      setInterviewRoulettePhase('spinning');
+      setInterviewRouletteAngle(finalAngle);
+    }, 150);
+
+    setTimeout(() => {
+      setInterviewRoulettePhase('result');
+      const [firstId, secondId, thirdId] = INTERVIEW_PERMUTATIONS[resultIndex];
+      setInterviewOrder({ firstId, secondId, thirdId });
+    }, 4700);
   };
 
   // ── 3/28 09:00 이후: 최종 확정 결과로 룰렛 회전만 재생 (새 추첨 아님)
@@ -1072,6 +1131,244 @@ export default function QSResultsPage() {
                   </div>
                 );
               })()}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ═══════════════════════════════════════════════════════
+          인터뷰 순서 룰렛 모달 (김창곤/백진영/양현호 1-2-3)
+      ═══════════════════════════════════════════════════════ */}
+      {showInterviewRoulette && (() => {
+        const toSvgXY = (degFromTop, r, cx = 130, cy = 130) => ({
+          x: cx + r * Math.sin((degFromTop * Math.PI) / 180),
+          y: cy - r * Math.cos((degFromTop * Math.PI) / 180),
+        });
+        const makeSectorPath = (startDeg, endDeg, r = 120, cx = 130, cy = 130) => {
+          const s = toSvgXY(startDeg, r, cx, cy);
+          const e = toSvgXY(endDeg, r, cx, cy);
+          return `M ${cx} ${cy} L ${s.x} ${s.y} A ${r} ${r} 0 0 1 ${e.x} ${e.y} Z`;
+        };
+
+        const getFill = (idx) => {
+          // 6개 세그먼트를 서로 구분되게 보이도록 색을 분산
+          const palette = ['#60a5fa', '#f97316', '#34d399', '#a78bfa', '#f43f5e', '#22c55e'];
+          return palette[idx % palette.length];
+        };
+
+        const resultIdx = interviewRouletteResultIndex;
+        const resultOrder = interviewOrder;
+        const firstName = resultOrder ? getInterviewName(resultOrder.firstId) : '';
+        const secondName = resultOrder ? getInterviewName(resultOrder.secondId) : '';
+        const thirdName = resultOrder ? getInterviewName(resultOrder.thirdId) : '';
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center px-4"
+            style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(12px)' }}
+          >
+            <div
+              className="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl"
+              style={{
+                background: 'linear-gradient(180deg, #0f172a 0%, #0a1a2e 60%, #0f0a1e 100%)',
+                border: '2px solid #60a5fa',
+                boxShadow: '0 0 60px rgba(59,130,246,0.35)',
+              }}
+            >
+              {/* 헤더 */}
+              <div
+                className="px-6 py-4 text-center"
+                style={{ background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #1d4ed8 100%)' }}
+              >
+                <p className="text-3xl mb-1">🎰</p>
+                <h2 className="text-xl font-black text-white">인터뷰 순서 룰렛</h2>
+                <p className="text-xs text-blue-200 mt-0.5">김창곤 · 백진영 · 양현호 · 1-2-3</p>
+              </div>
+
+              {/* 룰렛 휠 영역 */}
+              <div className="flex items-center justify-center py-4">
+                <div className="relative" style={{ width: 280, height: 280 }}>
+                  {/* 포인터 삼각형 (상단 중앙) */}
+                  <div
+                    className="absolute z-20"
+                    style={{
+                      top: -2,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '14px solid transparent',
+                      borderRight: '14px solid transparent',
+                      borderTop: '26px solid #60a5fa',
+                      filter: 'drop-shadow(0 0 8px rgba(96,165,250,1))',
+                    }}
+                  />
+                  {/* 외곽 링 */}
+                  <div
+                    className="absolute inset-0 rounded-full z-10 pointer-events-none"
+                    style={{
+                      border: '5px solid #60a5fa',
+                      boxShadow: '0 0 24px rgba(59,130,246,0.55), inset 0 0 12px rgba(0,0,0,0.5)',
+                    }}
+                  />
+
+                  {/* SVG 회전 휠 */}
+                  <svg
+                    width="280"
+                    height="280"
+                    viewBox="0 0 260 260"
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      transform: `rotate(${interviewRouletteAngle}deg)`,
+                      transition:
+                        interviewRoulettePhase === 'spinning'
+                          ? 'transform 4.5s cubic-bezier(0.08, 0.6, 0.1, 1)'
+                          : 'none',
+                    }}
+                  >
+                    {INTERVIEW_PERMUTATIONS.map((perm, idx) => {
+                      const startDeg = idx * 60;
+                      const endDeg = (idx + 1) * 60;
+                      const midDeg = startDeg + 30;
+
+                      const textPos = toSvgXY(midDeg, 72, 130, 130);
+                      const label = `${getInterviewShort(perm[0])}→${getInterviewShort(perm[1])}→${getInterviewShort(perm[2])}`;
+                      const isWin = interviewRoulettePhase === 'result' && idx === resultIdx;
+                      const fill = getFill(idx);
+
+                      return (
+                        <g key={label}>
+                          <path
+                            d={makeSectorPath(startDeg, endDeg)}
+                            fill={fill}
+                            stroke="#0f172a"
+                            strokeWidth="2.5"
+                            opacity={isWin ? 0.95 : 0.75}
+                          />
+                          <path
+                            d={makeSectorPath(startDeg, endDeg, 120)}
+                            fill="none"
+                            stroke={fill}
+                            strokeWidth="2"
+                            opacity={isWin ? 0.95 : 0.45}
+                          />
+
+                          {/* 라벨 */}
+                          <text
+                            x={textPos.x}
+                            y={textPos.y}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            fill={isWin ? '#dbeafe' : '#0b1220'}
+                            fontSize="10"
+                            fontWeight="900"
+                          >
+                            {label}
+                          </text>
+
+                          {/* 섹터 구분선 */}
+                          {(() => {
+                            const lineEnd = toSvgXY(endDeg, 120, 130, 130);
+                            return (
+                              <line
+                                x1="130"
+                                y1="130"
+                                x2={lineEnd.x}
+                                y2={lineEnd.y}
+                                stroke="#0f172a"
+                                strokeWidth="3"
+                                opacity="0.8"
+                              />
+                            );
+                          })()}
+                        </g>
+                      );
+                    })}
+
+                    {/* 중앙 허브 */}
+                    <circle cx="130" cy="130" r="22" fill="#0f172a" stroke="#60a5fa" strokeWidth="3" />
+                    <circle cx="130" cy="130" r="16" fill="#0a1a2e" stroke="#2563eb" strokeWidth="1.5" />
+                    <text x="130" y="130" textAnchor="middle" dominantBaseline="middle" fontSize="16">
+                      🎯
+                    </text>
+                  </svg>
+                </div>
+              </div>
+
+              {/* 스피닝 중 메시지 */}
+              {(interviewRoulettePhase === 'spinning' || interviewRoulettePhase === 'idle') && (
+                <div className="px-6 pb-5 text-center">
+                  <p className="text-blue-200 font-bold animate-pulse">
+                    {interviewRoulettePhase === 'spinning' ? '🎰 룰렛 중...' : '잠시 후 시작됩니다...'}
+                  </p>
+                  <div className="flex items-center justify-center gap-1 mt-2">
+                    {[0, 1, 2].map((i) => (
+                      <div
+                        key={i}
+                        className="w-2 h-2 rounded-full animate-bounce"
+                        style={{ background: '#60a5fa', animationDelay: `${i * 0.2}s` }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 결과 표시 */}
+              {interviewRoulettePhase === 'result' && resultOrder && (
+                <div className="px-6 pb-6">
+                  <div
+                    className="rounded-2xl px-6 py-5 mb-4 text-center"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(96,165,250,0.25) 0%, rgba(14,165,233,0.08) 100%)',
+                      border: '2px solid #60a5fa',
+                      boxShadow: '0 0 30px rgba(59,130,246,0.35)',
+                    }}
+                  >
+                    <p className="text-xs font-bold mb-2" style={{ color: '#93c5fd' }}>
+                      🎯 인터뷰 순서 확정
+                    </p>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="w-10 py-1 rounded-lg text-sm font-black" style={{ background: 'rgba(96,165,250,0.25)' }}>
+                          1순위
+                        </span>
+                        <span className="text-lg font-black text-white">{firstName}</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="w-10 py-1 rounded-lg text-sm font-black" style={{ background: 'rgba(96,165,250,0.25)' }}>
+                          2순위
+                        </span>
+                        <span className="text-lg font-black text-white">{secondName}</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="w-10 py-1 rounded-lg text-sm font-black" style={{ background: 'rgba(96,165,250,0.25)' }}>
+                          3순위
+                        </span>
+                        <span className="text-lg font-black text-white">{thirdName}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 닫기 버튼 */}
+              <div className="px-6 pb-6">
+                <button
+                  onClick={() => {
+                    setShowInterviewRoulette(false);
+                    setInterviewRoulettePhase('idle');
+                    setInterviewRouletteAngle(0);
+                  }}
+                  className="w-full py-2.5 rounded-xl text-sm font-bold transition"
+                  style={{
+                    background: 'linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)',
+                    color: '#0b1220',
+                  }}
+                >
+                  ✅ 확인 · 닫기
+                </button>
+              </div>
             </div>
           </div>
         );
@@ -2129,6 +2426,90 @@ export default function QSResultsPage() {
                   >
                     {copiedToken === 'ALL' ? '✅ 3명 URL 모두 복사됨' : '📋 3명 URL 전체 복사'}
                   </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          전단계: 인터뷰 순서 룰렛기 (피평가자 단계 추적 전)
+      ═══════════════════════════════════════════════════════ */}
+      {votingConfig.closed && assignments.length > 0 && (
+        <div className="mt-8 mb-4">
+          <div
+            className="rounded-2xl overflow-hidden border-2 shadow-2xl"
+            style={{ borderColor: '#60a5fa', background: 'linear-gradient(135deg, #0f172a 0%, #0a1a2e 100%)' }}
+          >
+            {/* 헤더 */}
+            <div
+              className="px-6 py-5 flex items-center justify-between gap-4"
+              style={{ background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #1d4ed8 100%)' }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">🎤</span>
+                <div>
+                  <h2 className="text-lg font-black text-blue-100">인터뷰 순서 룰렛기</h2>
+                  <p className="text-xs text-blue-200/80 font-medium mt-0.5">
+                    김창곤 · 백진영 · 양현호 인터뷰 순서를 1-2-3으로 무작위 결정합니다
+                  </p>
+                </div>
+              </div>
+
+              {adminMode ? (
+                <div className="flex items-center gap-2">
+                  {interviewOrder && (
+                    <span
+                      className="text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap"
+                      style={{
+                        background: 'rgba(96,165,250,0.2)',
+                        color: '#93c5fd',
+                        border: '1px solid rgba(96,165,250,0.4)',
+                      }}
+                    >
+                      ✅ 인터뷰 순서 확정됨
+                    </span>
+                  )}
+                  {!showInterviewRoulette && !showRoulette ? (
+                    <button
+                      onClick={handleSpinInterviewOrder}
+                      disabled={interviewRoulettePhase === 'spinning'}
+                      className="px-5 py-2.5 rounded-xl text-sm font-bold text-white transition hover:opacity-90 active:scale-95 shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                      style={{ background: 'linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)' }}
+                    >
+                      🎰 룰렛 {interviewOrder ? '다시 돌리기' : '돌리기'}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            {/* 본문 */}
+            <div className="px-6 py-5">
+              {interviewOrder ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    { label: '1순위', id: interviewOrder.firstId },
+                    { label: '2순위', id: interviewOrder.secondId },
+                    { label: '3순위', id: interviewOrder.thirdId },
+                  ].map(({ label, id }) => (
+                    <div
+                      key={label}
+                      className="rounded-xl border border-blue-900/30 bg-blue-900/10 p-4 text-center"
+                      style={{ boxShadow: '0 0 18px rgba(59,130,246,0.12)' }}
+                    >
+                      <p className="text-xs font-bold text-blue-200 mb-2">{label}</p>
+                      <p className="text-lg font-black text-slate-100">{getInterviewName(id)}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center">
+                  <p className="text-sm font-bold text-slate-200">아직 인터뷰 순서가 없습니다.</p>
+                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                    관리자 모드에서 룰렛을 돌리면 1-2-3 순서가 확정되고 화면에 표시됩니다.
+                  </p>
                 </div>
               )}
             </div>
