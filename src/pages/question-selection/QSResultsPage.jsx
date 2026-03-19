@@ -20,7 +20,10 @@ import {
   loadAssignmentsLocal,
   saveAssignmentsLocal,
   clearAssignmentsLocal,
+  EXAM_DATE,
   EXAM_DATE_STR,
+  FINAL_FIXED_DRAWS,
+  FINAL_STAGE2_ASSIGNMENTS,
   SCHEDULE_MILESTONES,
   getCurrentStep,
   ROUND2_DATE_STR,
@@ -549,6 +552,9 @@ export default function QSResultsPage() {
     { key: 'temporary_payment', label: '가지급금', icon: '💰', color: '#6ee7b7', fill: '#1a4035', stroke: '#10b981' },
   ];
 
+  // 3월 28일 오전 9시 이후에만 「추첨 결과 보기」 버튼 노출 (결과는 룰렛에서만 표시)
+  const isAfterRevealTime = () => new Date() >= EXAM_DATE;
+
   // ── 4단계 최종 1문제 추첨 실행 (룰렛 모달 오픈)
   const handleFinalDraw = (candidateId) => {
     // 추첨 결과 미리 계산 (결정론적)
@@ -601,6 +607,48 @@ export default function QSResultsPage() {
   // ── 추적 데이터 리프레시
   const refreshTracker = () => {
     setTrackerSummary(getCandidateTrackerSummary());
+  };
+
+  // ── 3/28 09:00 이후: 최종 확정 결과로 룰렛 회전만 재생 (새 추첨 아님)
+  const handleRevealDraw = (candidateId) => {
+    const fixed = FINAL_FIXED_DRAWS[candidateId];
+    const existing = drawResults[candidateId];
+    const cs = trackerSummary.find((c) => c.candidateId === candidateId);
+    const fromTracker = cs?.record?.stage4;
+    const result = fixed
+      ? { category: fixed.category, questionId: fixed.questionId }
+      : existing?.questionId != null
+        ? { category: existing.category, questionId: existing.questionId }
+        : fromTracker?.selectedQuestionId != null
+          ? { category: fromTracker.selectedCategory, questionId: fromTracker.selectedQuestionId }
+          : null;
+    if (!result?.category || result.questionId == null) return;
+
+    const stage2 = cs?.record?.stage2 ?? FINAL_STAGE2_ASSIGNMENTS[candidateId];
+    const questions = ROULETTE_CATS.map((cat) => ({
+      ...cat,
+      questionId: stage2?.[cat.key] ?? '?',
+    }));
+    const winIdx = ROULETTE_CATS.findIndex((c) => c.key === result.category);
+    const sectorCenter = winIdx * 120 + 60;
+    const finalAngle = 6 * 360 + (360 - sectorCenter);
+
+    setRouletteCandidateId(candidateId);
+    setRouletteQuestions(questions);
+    setRouletteResult(result);
+    setRouletteAngle(0);
+    setRoulettePhase('idle');
+    setShowRoulette(true);
+    setDrawSpinning(candidateId);
+
+    setTimeout(() => {
+      setRoulettePhase('spinning');
+      setRouletteAngle(finalAngle);
+    }, 150);
+    setTimeout(() => {
+      setRoulettePhase('result');
+      setDrawSpinning(null);
+    }, 4700);
   };
 
   // ── 4단계 최종 선정 확정 (룰렛 결과 후 "이 문제로 최종 확정" 버튼)
@@ -2124,7 +2172,10 @@ export default function QSResultsPage() {
             <div className="px-6 py-5">
               <div className="space-y-4">
                 {trackerSummary.map((cs) => {
-                  const draw = drawResults[cs.candidateId];
+                  const fixedDraw = FINAL_FIXED_DRAWS[cs.candidateId];
+                  const draw = fixedDraw
+                    ? { ...fixedDraw, confirmed: true }
+                    : drawResults[cs.candidateId];
                   const isDraw = drawSpinning === cs.candidateId;
                   const hasAssignment = cs.stage2Questions !== '미배정';
 
@@ -2177,9 +2228,9 @@ export default function QSResultsPage() {
 
                       {/* 데이터 요약 행 */}
                       <div className="px-5 py-3 grid grid-cols-3 gap-3">
-                        {/* 2차 배정 문제 */}
+                        {/* 2차 배정결과 */}
                         <div className="text-center">
-                          <p className="text-[10px] text-slate-500 mb-1">2차 배정 문제</p>
+                          <p className="text-[10px] text-slate-500 mb-1">2차 배정결과</p>
                           <p className="text-sm font-black text-slate-300">{cs.stage2Questions}</p>
                         </div>
 
@@ -2193,40 +2244,15 @@ export default function QSResultsPage() {
                             </div>
                           ) : draw ? (
                             <div>
-                              <span className="text-lg font-black" style={{ color: draw.confirmed ? '#34d399' : '#f87171' }}>
-                                #{draw.questionId}
-                              </span>
-                              <p className="text-[10px]" style={{ color: draw.confirmed ? '#6ee7b7' : '#fca5a580' }}>
-                                {getCategoryLabel(draw.category)}
-                              </p>
-                              {draw.confirmed ? (
-                                <span
-                                  className="inline-block text-[9px] px-2 py-0.5 rounded-full font-bold mt-1"
-                                  style={{ background: 'rgba(5,150,105,0.2)', color: '#34d399', border: '1px solid #065f4680' }}
-                                >
-                                  ✅ 확정완료
-                                </span>
-                              ) : adminMode && (
+                              <span className="text-lg font-black text-slate-500">🔒</span>
+                              <p className="text-[10px] text-slate-500 mt-0.5">3월28일 공개</p>
+                              {isAfterRevealTime() && (
                                 <button
-                                  onClick={() => {
-                                    setRouletteResult(drawResults[cs.candidateId]);
-                                    setRouletteCandidateId(cs.candidateId);
-                                    setRouletteQuestions(ROULETTE_CATS.map((cat) => ({
-                                      ...cat,
-                                      questionId: cs?.record?.stage2?.[cat.key] ?? '?',
-                                    })));
-                                    setRoulettePhase('result');
-                                    setRouletteAngle(0);
-                                    setShowRoulette(true);
-                                  }}
-                                  className="block mx-auto mt-1 text-[9px] px-2 py-0.5 rounded font-bold transition"
-                                  style={{ background: '#166534', color: '#4ade80', border: '1px solid #16653480' }}
+                                  onClick={() => handleRevealDraw(cs.candidateId)}
+                                  className="block mx-auto mt-1.5 text-[9px] px-2 py-0.5 rounded font-bold transition border border-emerald-500/60 text-emerald-400 hover:bg-emerald-900/30"
                                 >
-                                  🎯 확정하기
+                                  🎰 추첨 결과 보기 (회전)
                                 </button>
-                              )}
-                              {!draw.confirmed && !adminMode && (
-                                <span className="text-[9px] text-amber-500/60 block mt-0.5">미확정</span>
                               )}
                             </div>
                           ) : (

@@ -31,6 +31,18 @@ export const MENTORING_START   = new Date('2026-03-18T00:00:00');
 export const MENTORING_END     = new Date('2026-03-27T23:59:59');
 export const EXAM_DATE         = new Date('2026-03-28T09:00:00');
 export const EXAM_DATE_STR     = '2026년 3월 28일(토)';
+/** 4단계 최종 확정 배정 (평가당일 공개용) — 김창곤 차명주식 #3, 백진영 가지급금 #11, 양현호 주식이동 #4 */
+export const FINAL_FIXED_DRAWS = {
+  kcg: { category: 'nominee_stock', questionId: 3 },
+  bjy: { category: 'temporary_payment', questionId: 11 },
+  yhh: { category: 'stock_transfer', questionId: 4 },
+};
+/** 2차 배정결과 (표시용) — 토큰 kcg-5-3-6, bjy-5-1-11, yhh-4-10-11 */
+export const FINAL_STAGE2_ASSIGNMENTS = {
+  kcg: { stock_transfer: 5, nominee_stock: 3, temporary_payment: 6 },
+  bjy: { stock_transfer: 5, nominee_stock: 1, temporary_payment: 11 },
+  yhh: { stock_transfer: 4, nominee_stock: 10, temporary_payment: 11 },
+};
 export const RESULT_DATE       = new Date('2026-03-31T00:00:00');
 export const RESULT_DATE_STR   = '2026년 3월 31일(화)';
 export const CERT_DATE_STR     = '4월 TAG일';
@@ -186,7 +198,17 @@ function seededRandom(seed) {
 }
 
 /**
- * 피평가자별 랜덤 문제 배정
+ * 피평가자별 분야 우선 순서 (1명당 1분야 우선)
+ * kcg → 주식이동 우선, bjy → 차명주식 우선, yhh → 가지급금 우선
+ */
+const CANDIDATE_PRIORITY_ORDER = [
+  ['stock_transfer', 'nominee_stock', 'temporary_payment'],   // 김창곤: 주식이동 우선
+  ['nominee_stock', 'stock_transfer', 'temporary_payment'],   // 백진영: 차명주식 우선
+  ['temporary_payment', 'stock_transfer', 'nominee_stock'],   // 양현호: 가지급금 우선
+];
+
+/**
+ * 피평가자별 랜덤 문제 배정 (분야 우선: 주식이동/차명주식/가지급금 각 1명씩 우선 배정)
  * @param {boolean} useTimeSeed - true면 현재 시간 기반 시드(완전 랜덤), false면 고정 시드
  */
 export function generateRandomAssignments(useTimeSeed = true) {
@@ -194,16 +216,23 @@ export function generateRandomAssignments(useTimeSeed = true) {
   const rand = seededRandom(seed);
   const pick = (arr) => arr[Math.floor(rand() * arr.length)];
 
-  return ROUND2_CANDIDATES.map((c) => ({
-    candidateId:   c.id,
-    candidateName: c.name,
-    candidateTeam: c.team,
-    stock_transfer:    pick(ROUND2_QUESTION_POOL.stock_transfer),
-    nominee_stock:     pick(ROUND2_QUESTION_POOL.nominee_stock),
-    temporary_payment: pick(ROUND2_QUESTION_POOL.temporary_payment),
-    assignedAt: new Date().toISOString(),
-    seed,
-  }));
+  return ROUND2_CANDIDATES.map((c, idx) => {
+    const order = CANDIDATE_PRIORITY_ORDER[idx] || CANDIDATE_PRIORITY_ORDER[0];
+    const assignment = {
+      candidateId:   c.id,
+      candidateName: c.name,
+      candidateTeam: c.team,
+      stock_transfer:    null,
+      nominee_stock:     null,
+      temporary_payment: null,
+      assignedAt: new Date().toISOString(),
+      seed,
+    };
+    order.forEach((key) => {
+      assignment[key] = pick(ROUND2_QUESTION_POOL[key]);
+    });
+    return assignment;
+  });
 }
 
 // ─── URL 토큰 인코딩/디코딩 ──────────────────────────────────────
@@ -752,6 +781,35 @@ export async function loadFinalDrawFromSupabase() {
   return results;
 }
 
+/**
+ * 4단계 추첨 결과 초기화 (재실행용) — 해당 피평가자만 추첨 전 상태로 되돌림
+ * @param {string} candidateId - 피평가자 ID
+ */
+export function resetStage4Draw(candidateId) {
+  updateCandidateTracker(candidateId, {
+    stage4: {
+      status: 'pending',
+      selectedCategory: null,
+      selectedQuestionId: null,
+      selectedAt: null,
+      selectedBy: null,
+      seed: null,
+      confirmed: false,
+      confirmedAt: null,
+    },
+  });
+  if (supabase) {
+    supabase
+      .from('qs_final_draw')
+      .delete()
+      .eq('period_id', ACTIVE_PERIOD_ID)
+      .eq('candidate_id', candidateId)
+      .then(({ error }) => {
+        if (error) console.warn('[Supabase] 4단계 추첨 초기화 삭제 실패:', error);
+      });
+  }
+}
+
 // ─── 4단계 최종 선정 확정 (관리자 확정 버튼 클릭) ─────────────
 /**
  * 4단계 최종 1문제 확정 저장
@@ -837,15 +895,19 @@ export function getCandidateTrackerSummary() {
   return ROUND2_CANDIDATES.map((c) => {
     const record = tracker[c.id] || createEmptyRecord(c.id, c.name, c.team);
     const stageStatus = getCandidateCurrentStage(c.id);
+    const stage2 = record.stage2?.stock_transfer != null
+      ? record.stage2
+      : FINAL_STAGE2_ASSIGNMENTS[c.id];
+    const stage2Questions = stage2
+      ? `#${stage2.stock_transfer}, #${stage2.nominee_stock}, #${stage2.temporary_payment}`
+      : '미배정';
 
     return {
       candidateId: c.id,
       name: c.name,
       team: c.team,
       currentStage: stageStatus,
-      stage2Questions: record.stage2?.stock_transfer
-        ? `#${record.stage2.stock_transfer}, #${record.stage2.nominee_stock}, #${record.stage2.temporary_payment}`
-        : '미배정',
+      stage2Questions,
       stage4Selected: record.stage4?.selectedQuestionId
         ? `#${record.stage4.selectedQuestionId} (${getCategoryLabel(record.stage4.selectedCategory)})`
         : '미추첨',
