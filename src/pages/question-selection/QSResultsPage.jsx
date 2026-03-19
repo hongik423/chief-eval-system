@@ -1865,18 +1865,21 @@ export default function QSResultsPage() {
 
               {/* ── 실행 버튼 영역 ── */}
               <div id="assignments-action-area" className="flex items-center gap-3 mb-5 flex-wrap">
-                {/* 랜덤배정출제: 관리자=실제 저장, 비관리자=미리보기 */}
+                {/* 랜덤배정출제: 확정 후 재실행 잠금 */}
                 <button
                   onClick={handleRandomAssignment}
-                  disabled={isSpinning}
-                  className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm transition hover:opacity-90 shadow-lg active:scale-95 border-2 disabled:opacity-50"
+                  disabled={isSpinning || !!assignSavedAt}
+                  title={assignSavedAt ? '확정 완료 — 재실행 불가' : undefined}
+                  className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm transition shadow-lg border-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:opacity-50"
                   style={
-                    adminMode
-                      ? { background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)', borderColor: 'rgb(163,120,55)', color: '#1a1207' }
-                      : { background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderColor: '#d97706', color: '#fbbf24' }
+                    assignSavedAt
+                      ? { background: '#1e293b', borderColor: '#475569', color: '#64748b' }
+                      : adminMode
+                        ? { background: 'linear-gradient(135deg, rgb(214,173,101) 0%, rgb(163,120,55) 100%)', borderColor: 'rgb(163,120,55)', color: '#1a1207' }
+                        : { background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderColor: '#d97706', color: '#fbbf24' }
                   }
                 >
-                  🎲 랜덤배정출제
+                  {assignSavedAt ? '🔒' : '🎲'} 랜덤배정출제
                   {assignments.length > 0 || testAssignments.length > 0 ? ' (재실행)' : ''}
                 </button>
 
